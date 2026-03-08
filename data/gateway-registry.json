@@ -1,0 +1,57 @@
+{
+  "version": "m1-demo-20260308",
+  "description": "Agent Board v2 M1 demo registry (read-only)",
+  "gateways": [
+    {
+      "id": "gw-dev-01",
+      "name": "Dev Gateway Alpha",
+      "env": "dev",
+      "region": "cn-sh-1",
+      "endpoint": "ws://dev-gateway-alpha.local/ws",
+      "authRef": "secret://gateway/dev-alpha",
+      "capabilities": { "diagnostics": true, "logs": true, "restart": true },
+      "tags": ["demo", "dev", "alpha"],
+      "simulation": {
+        "mode": "healthy",
+        "baseLatencyMs": 55,
+        "jitterMs": 25,
+        "agentCount": 5,
+        "sessionCount": 11
+      }
+    },
+    {
+      "id": "gw-staging-01",
+      "name": "Staging Gateway Beta",
+      "env": "staging",
+      "region": "cn-sh-2",
+      "endpoint": "ws://staging-gateway-beta.local/ws",
+      "authRef": "secret://gateway/staging-beta",
+      "capabilities": { "diagnostics": true, "logs": true, "restart": false },
+      "tags": ["demo", "staging", "beta"],
+      "simulation": {
+        "mode": "flaky",
+        "baseLatencyMs": 95,
+        "jitterMs": 35,
+        "agentCount": 8,
+        "sessionCount": 17
+      }
+    },
+    {
+      "id": "gw-prod-01",
+      "name": "Prod Gateway Core",
+      "env": "prod",
+      "region": "cn-bj-1",
+      "endpoint": "wss://prod-gateway-core.example/ws",
+      "authRef": "secret://gateway/prod-core",
+      "capabilities": { "diagnostics": true, "logs": true, "restart": true },
+      "tags": ["demo", "prod", "core"],
+      "simulation": {
+        "mode": "degraded",
+        "baseLatencyMs": 140,
+        "jitterMs": 50,
+        "agentCount": 13,
+        "sessionCount": 33
+      }
+    }
+  ]
+}
