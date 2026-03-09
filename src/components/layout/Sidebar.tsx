@@ -1,10 +1,11 @@
 import { NavLink } from 'react-router-dom'
-import { MdDashboard, MdSmartToy, MdAccountTree, MdTask, MdSettings } from 'react-icons/md'
+import { MdDashboard, MdSmartToy, MdAccountTree, MdMemory, MdTask, MdSettings } from 'react-icons/md'
 
 const navItems = [
   { to: '/', icon: MdDashboard, label: 'Dashboard' },
   { to: '/agents', icon: MdSmartToy, label: 'Agents' },
   { to: '/sessions', icon: MdAccountTree, label: 'Sessions' },
+  { to: '/memory', icon: MdMemory, label: 'Memory' },
   { to: '/tasks', icon: MdTask, label: 'Tasks' },
   { to: '/settings', icon: MdSettings, label: 'Settings' },
 ]

@@ -13,8 +13,10 @@ const OPENCLAW_HOME = path.join(
   process.env.HOME || '/Users/wenkang',
   '.openclaw'
 )
-const TASKS_FILE = path.join(OPENCLAW_HOME, 'workspace/tasks/running_tasks.md')
-const MEMORY_DIR = path.join(OPENCLAW_HOME, 'workspace/memory')
+const WORKSPACE_DIR = path.join(OPENCLAW_HOME, 'workspace')
+const TASKS_FILE = path.join(WORKSPACE_DIR, 'tasks/running_tasks.md')
+const MEMORY_DIR = path.join(WORKSPACE_DIR, 'memory')
+const MEMORY_INDEX_FILE = path.join(WORKSPACE_DIR, 'MEMORY.md')
 const SUBAGENT_RUNS_FILE = path.join(OPENCLAW_HOME, 'subagents/runs.json')
 const AGENTS_DIR = path.join(OPENCLAW_HOME, 'agents')
 
@@ -90,51 +92,329 @@ function parseTasksMd(md) {
 
 // ── Memory Directory Scanner ──────────────────────────────────────────────────
 
+// Extensions considered previewable as plain text
+const PREVIEWABLE_EXTS = new Set(['.md', '.txt', '.json', '.jsonl'])
+
+function extOf(name) {
+  const dot = name.lastIndexOf('.')
+  return dot >= 0 ? name.slice(dot).toLowerCase() : ''
+}
+
+function memoryCategoryOf(relativePath, name) {
+  if (name === 'MEMORY.md') return 'index'
+  if (/^\d{4}-\d{2}-\d{2}\.md$/.test(name)) return 'daily'
+  if (relativePath.startsWith('archive/')) return 'archive'
+  if (['projects.md', 'infra.md', 'lessons.md', 'promotions.md'].includes(name)) return 'catalog'
+  return 'note'
+}
+
+function memoryTagsOf(relativePath, name) {
+  const tags = [memoryCategoryOf(relativePath, name)]
+  const dateMatch = name.match(/^(\d{4})-(\d{2})-(\d{2})\.md$/)
+  if (dateMatch) tags.push(`${dateMatch[1]}-${dateMatch[2]}`)
+
+  const topFolder = relativePath.includes('/') ? relativePath.split('/')[0] : ''
+  if (topFolder) tags.push(topFolder)
+
+  return [...new Set(tags.filter(Boolean))]
+}
+
+function buildMemoryFileNode(rootDir, filePath, stat) {
+  const relativePath = filePath === MEMORY_INDEX_FILE
+    ? 'MEMORY.md'
+    : path.relative(rootDir, filePath)
+  const name = path.basename(filePath)
+  const ext = extOf(name)
+
+  return {
+    type: 'file',
+    name,
+    ext,
+    path: filePath,
+    relativePath,
+    sizeBytes: stat.size,
+    modifiedAt: stat.mtimeMs,
+    previewable: PREVIEWABLE_EXTS.has(ext),
+    category: memoryCategoryOf(relativePath, name),
+    tags: memoryTagsOf(relativePath, name),
+  }
+}
+
 function scanMemoryDir(dir) {
-  const files = []
-  try {
-    const entries = fs.readdirSync(dir, { withFileTypes: true })
+  const warnings = []
+  const flatFiles = []
+
+  function walk(currentDir) {
+    const nodes = []
+    let entries = []
+
+    try {
+      entries = fs.readdirSync(currentDir, { withFileTypes: true })
+    } catch (error) {
+      warnings.push(`scan failed: ${currentDir} -> ${String(error?.message || error)}`)
+      return nodes
+    }
+
     for (const entry of entries) {
-      const fullPath = path.join(dir, entry.name)
+      const fullPath = path.join(currentDir, entry.name)
+
       if (entry.isFile() && entry.name.endsWith('.md')) {
-        const stat = fs.statSync(fullPath)
-        files.push({
-          name: entry.name,
-          path: fullPath,
-          sizeBytes: stat.size,
-          modifiedAt: stat.mtimeMs,
-        })
-      } else if (entry.isDirectory()) {
-        const subFiles = []
         try {
-          const subEntries = fs.readdirSync(fullPath, { withFileTypes: true })
-          for (const sub of subEntries) {
-            if (sub.isFile() && sub.name.endsWith('.md')) {
-              const subPath = path.join(fullPath, sub.name)
-              const subStat = fs.statSync(subPath)
-              subFiles.push({
-                name: sub.name,
-                path: subPath,
-                sizeBytes: subStat.size,
-                modifiedAt: subStat.mtimeMs,
-              })
-            }
-          }
-        } catch {
-          // skip unreadable directory
+          const stat = fs.statSync(fullPath)
+          const fileNode = buildMemoryFileNode(dir, fullPath, stat)
+          nodes.push(fileNode)
+          flatFiles.push(fileNode)
+        } catch (error) {
+          warnings.push(`stat failed: ${fullPath} -> ${String(error?.message || error)}`)
         }
-        files.push({
-          name: entry.name,
-          type: 'directory',
-          path: fullPath,
-          files: subFiles,
-        })
+        continue
+      }
+
+      if (!entry.isDirectory()) continue
+
+      const childNodes = walk(fullPath)
+      nodes.push({
+        type: 'directory',
+        name: entry.name,
+        path: fullPath,
+        relativePath: path.relative(dir, fullPath),
+        files: childNodes,
+      })
+    }
+
+    return nodes.sort((a, b) => {
+      const aIsDir = a.type === 'directory'
+      const bIsDir = b.type === 'directory'
+      if (aIsDir !== bIsDir) return aIsDir ? -1 : 1
+      return String(a.name).localeCompare(String(b.name))
+    })
+  }
+
+  try {
+    const files = walk(dir)
+
+    if (fs.existsSync(MEMORY_INDEX_FILE)) {
+      try {
+        const stat = fs.statSync(MEMORY_INDEX_FILE)
+        const indexNode = buildMemoryFileNode(dir, MEMORY_INDEX_FILE, stat)
+        files.unshift(indexNode)
+        flatFiles.unshift(indexNode)
+      } catch (error) {
+        warnings.push(`stat failed: ${MEMORY_INDEX_FILE} -> ${String(error?.message || error)}`)
       }
     }
+
+    return {
+      files,
+      flatFiles,
+      partial: warnings.length > 0,
+      warnings,
+    }
   } catch (err) {
-    return { error: String(err), files: [] }
+    return { error: String(err), files: [], flatFiles: [], partial: true, warnings }
   }
-  return { files }
+}
+
+// ── Memory v1 Scanner (all file types) ───────────────────────────────────────
+
+function scanMemoryDirV1(dir) {
+  const warnings = []
+  const flatFiles = []
+
+  function walk(currentDir) {
+    const nodes = []
+    let entries = []
+
+    try {
+      entries = fs.readdirSync(currentDir, { withFileTypes: true })
+    } catch (error) {
+      warnings.push(`scan failed: ${currentDir} -> ${String(error?.message || error)}`)
+      return nodes
+    }
+
+    for (const entry of entries) {
+      const fullPath = path.join(currentDir, entry.name)
+
+      if (entry.isFile()) {
+        try {
+          const stat = fs.statSync(fullPath)
+          const fileNode = buildMemoryFileNode(dir, fullPath, stat)
+          nodes.push(fileNode)
+          flatFiles.push(fileNode)
+        } catch (error) {
+          warnings.push(`stat failed: ${fullPath} -> ${String(error?.message || error)}`)
+        }
+        continue
+      }
+
+      if (!entry.isDirectory()) continue
+
+      const childNodes = walk(fullPath)
+      const childFileCount = childNodes.reduce((n, c) => n + (c.type === 'file' ? 1 : (c.fileCount || 0)), 0)
+      nodes.push({
+        type: 'directory',
+        name: entry.name,
+        path: fullPath,
+        relativePath: path.relative(dir, fullPath),
+        children: childNodes,
+        fileCount: childFileCount,
+      })
+    }
+
+    return nodes.sort((a, b) => {
+      const aIsDir = a.type === 'directory'
+      const bIsDir = b.type === 'directory'
+      if (aIsDir !== bIsDir) return aIsDir ? -1 : 1
+      return String(a.name).localeCompare(String(b.name))
+    })
+  }
+
+  try {
+    const tree = walk(dir)
+
+    if (fs.existsSync(MEMORY_INDEX_FILE)) {
+      try {
+        const stat = fs.statSync(MEMORY_INDEX_FILE)
+        const indexNode = buildMemoryFileNode(dir, MEMORY_INDEX_FILE, stat)
+        tree.unshift(indexNode)
+        flatFiles.unshift(indexNode)
+      } catch (error) {
+        warnings.push(`stat failed: ${MEMORY_INDEX_FILE} -> ${String(error?.message || error)}`)
+      }
+    }
+
+    return { tree, flatFiles, partial: warnings.length > 0, warnings }
+  } catch (err) {
+    return { error: String(err), tree: [], flatFiles: [], partial: true, warnings }
+  }
+}
+
+// ── Memory v1 Text Preview ────────────────────────────────────────────────────
+
+function readTextFilePreview(filePath, maxChars) {
+  const stat = fs.statSync(filePath)
+  if (!stat.isFile()) throw new Error('Not a file')
+
+  const ext = extOf(path.basename(filePath))
+  if (!PREVIEWABLE_EXTS.has(ext)) throw new Error(`Not previewable: ${ext || '(no ext)'}`)
+
+  const fullText = fs.readFileSync(filePath, 'utf-8')
+  const preview = fullText.length > maxChars ? fullText.slice(0, maxChars) : fullText
+  const lines = fullText.split('\n')
+
+  const relativePath = filePath === MEMORY_INDEX_FILE
+    ? 'MEMORY.md'
+    : path.relative(MEMORY_DIR, filePath)
+
+  const result = {
+    path: filePath,
+    relativePath,
+    name: path.basename(filePath),
+    ext,
+    sizeBytes: stat.size,
+    modifiedAt: stat.mtimeMs,
+    lineCount: lines.length,
+    truncated: fullText.length > preview.length,
+    preview,
+  }
+
+  // Enrich markdown files with headings + inline tags
+  if (ext === '.md') {
+    const headings = []
+    for (const line of lines) {
+      const match = line.match(/^(#{1,6})\s+(.+)$/)
+      if (!match) continue
+      headings.push({ level: match[1].length, text: match[2].trim() })
+      if (headings.length >= 24) break
+    }
+    result.headings = headings
+
+    const tagSet = new Set()
+    for (const line of lines) {
+      if (!line.includes('#')) continue
+      const matches = line.match(/#[\p{L}\p{N}_-]+/gu) || []
+      for (const tag of matches) {
+        if (tag.length <= 1) continue
+        tagSet.add(tag.slice(1))
+        if (tagSet.size >= 24) break
+      }
+      if (tagSet.size >= 24) break
+    }
+    result.tags = [...tagSet]
+  }
+
+  return result
+}
+
+function resolveMemoryFilePath(rawPath) {
+  const candidate = String(rawPath || '').trim()
+  if (!candidate) return null
+
+  // Special handling for MEMORY.md - it's in workspace root, not in memory subdir
+  if (candidate === 'MEMORY.md' && fs.existsSync(MEMORY_INDEX_FILE)) {
+    return MEMORY_INDEX_FILE
+  }
+
+  const absolute = path.isAbsolute(candidate)
+    ? path.resolve(candidate)
+    : path.resolve(MEMORY_DIR, candidate)
+
+  const inMemoryDir = absolute === MEMORY_DIR || absolute.startsWith(`${MEMORY_DIR}${path.sep}`)
+  const isIndexFile = absolute === MEMORY_INDEX_FILE
+
+  if (!inMemoryDir && !isIndexFile) return null
+  return absolute
+}
+
+function readMemoryFilePreview(filePath, maxChars) {
+  const stat = fs.statSync(filePath)
+  if (!stat.isFile()) {
+    throw new Error('目标不是文件')
+  }
+  if (!filePath.endsWith('.md')) {
+    throw new Error('仅支持 .md 文件')
+  }
+
+  const fullText = fs.readFileSync(filePath, 'utf-8')
+  const preview = fullText.length > maxChars ? fullText.slice(0, maxChars) : fullText
+  const lines = fullText.split('\n')
+
+  const headings = []
+  for (const line of lines) {
+    const match = line.match(/^(#{1,6})\s+(.+)$/)
+    if (!match) continue
+    headings.push({ level: match[1].length, text: match[2].trim() })
+    if (headings.length >= 24) break
+  }
+
+  const tagSet = new Set()
+  for (const line of lines) {
+    if (!line.includes('#')) continue
+    const matches = line.match(/#[\p{L}\p{N}_-]+/gu) || []
+    for (const tag of matches) {
+      if (tag.length <= 1) continue
+      tagSet.add(tag.slice(1))
+      if (tagSet.size >= 24) break
+    }
+    if (tagSet.size >= 24) break
+  }
+
+  const relativePath = filePath === MEMORY_INDEX_FILE
+    ? 'MEMORY.md'
+    : path.relative(MEMORY_DIR, filePath)
+
+  return {
+    path: filePath,
+    relativePath,
+    name: path.basename(filePath),
+    sizeBytes: stat.size,
+    modifiedAt: stat.mtimeMs,
+    lineCount: lines.length,
+    truncated: fullText.length > preview.length,
+    preview,
+    headings,
+    tags: [...tagSet],
+  }
 }
 
 // ── Session BFF Helpers ───────────────────────────────────────────────────────
@@ -743,6 +1023,121 @@ const server = http.createServer(async (req, res) => {
     return
   }
 
+  // GET /api/memory/file?path=...&maxChars=12000
+  if (req.method === 'GET' && pathname === '/api/memory/file') {
+    const filePath = resolveMemoryFilePath(url.searchParams.get('path') || '')
+    if (!filePath) {
+      apiError(res, 400, 'INVALID_MEMORY_PATH', '不允许访问该路径')
+      return
+    }
+
+    const maxChars = parseIntWithBounds(url.searchParams.get('maxChars'), 12_000, 500, 60_000)
+
+    try {
+      const data = readMemoryFilePreview(filePath, maxChars)
+      json(res, 200, {
+        ok: true,
+        ts: Date.now(),
+        source: filePath,
+        data,
+      })
+    } catch (err) {
+      apiError(res, 500, 'MEMORY_FILE_READ_FAILED', '读取 Memory 文件失败', String(err))
+    }
+    return
+  }
+
+  // ── Memory v1 endpoints ───────────────────────────────────────────────────
+
+  // GET /api/v1/memory/tree
+  if (req.method === 'GET' && pathname === '/api/v1/memory/tree') {
+    const result = scanMemoryDirV1(MEMORY_DIR)
+    json(res, result.error ? 500 : 200, {
+      ok: !result.error,
+      ts: Date.now(),
+      source: MEMORY_DIR,
+      data: {
+        tree: result.tree,
+        totalFiles: result.flatFiles.length,
+        partial: result.partial,
+        warnings: result.warnings,
+      },
+    })
+    return
+  }
+
+  // GET /api/v1/memory/list?sort=modified|name&category=<cat>
+  if (req.method === 'GET' && pathname === '/api/v1/memory/list') {
+    const sort = url.searchParams.get('sort') || 'modified'
+    const categoryFilter = url.searchParams.get('category') || ''
+    const result = scanMemoryDirV1(MEMORY_DIR)
+
+    let files = result.flatFiles
+    if (categoryFilter) {
+      files = files.filter(f => f.category === categoryFilter)
+    }
+    if (sort === 'name') {
+      files = [...files].sort((a, b) => String(a.name).localeCompare(String(b.name)))
+    } else {
+      files = [...files].sort((a, b) => (b.modifiedAt || 0) - (a.modifiedAt || 0))
+    }
+
+    json(res, result.error ? 500 : 200, {
+      ok: !result.error,
+      ts: Date.now(),
+      source: MEMORY_DIR,
+      data: {
+        files,
+        total: files.length,
+        partial: result.partial,
+        warnings: result.warnings,
+      },
+    })
+    return
+  }
+
+  // GET /api/v1/memory/preview?path=...&maxChars=12000
+  if (req.method === 'GET' && pathname === '/api/v1/memory/preview') {
+    const rawPath = url.searchParams.get('path') || ''
+    const filePath = resolveMemoryFilePath(rawPath)
+    if (!filePath) {
+      apiError(res, 400, 'INVALID_MEMORY_PATH', 'Path not allowed or missing')
+      return
+    }
+    const maxChars = parseIntWithBounds(url.searchParams.get('maxChars'), 12_000, 500, 60_000)
+    try {
+      const data = readTextFilePreview(filePath, maxChars)
+      json(res, 200, { ok: true, ts: Date.now(), data })
+    } catch (err) {
+      const code = String(err?.message || err).startsWith('Not previewable')
+        ? 'NOT_PREVIEWABLE'
+        : 'PREVIEW_READ_FAILED'
+      apiError(res, code === 'NOT_PREVIEWABLE' ? 400 : 500, code, String(err?.message || err))
+    }
+    return
+  }
+
+  // GET /api/v1/memory/detail?path=...&maxChars=60000
+  if (req.method === 'GET' && pathname === '/api/v1/memory/detail') {
+    const rawPath = url.searchParams.get('path') || ''
+    const filePath = resolveMemoryFilePath(rawPath)
+    if (!filePath) {
+      apiError(res, 400, 'INVALID_MEMORY_PATH', 'Path not allowed or missing')
+      return
+    }
+    const maxChars = parseIntWithBounds(url.searchParams.get('maxChars'), 60_000, 500, 200_000)
+    try {
+      const data = readTextFilePreview(filePath, maxChars)
+      json(res, 200, { ok: true, ts: Date.now(), data })
+    } catch (err) {
+      const code = String(err?.message || err).startsWith('Not previewable')
+        ? 'NOT_PREVIEWABLE'
+        : 'DETAIL_READ_FAILED'
+      apiError(res, code === 'NOT_PREVIEWABLE' ? 400 : 500, code, String(err?.message || err))
+    }
+    return
+  }
+
   // GET /api/runs
   if (req.method === 'GET' && pathname === '/api/runs') {
     const runsIndex = loadRunsIndex()
@@ -924,8 +1319,13 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(PORT, '127.0.0.1', () => {
   console.log(`✅ BFF running at http://127.0.0.1:${PORT}`)
-  console.log(`   GET /api/tasks`) 
-  console.log(`   GET /api/memory`)
+  console.log(`   GET /api/tasks`)
+  console.log(`   GET /api/memory                              (legacy)`)
+  console.log(`   GET /api/memory/file?path=<p>&maxChars=<n>  (legacy)`)
+  console.log(`   GET /api/v1/memory/tree`)
+  console.log(`   GET /api/v1/memory/list?sort=modified|name&category=<cat>`)
+  console.log(`   GET /api/v1/memory/preview?path=<p>&maxChars=<n>`)
+  console.log(`   GET /api/v1/memory/detail?path=<p>&maxChars=<n>`)
   console.log(`   GET /api/runs`)
   console.log(`   GET /api/sessions`)
   console.log(`   GET /api/sessions/:sessionKey/detail`)

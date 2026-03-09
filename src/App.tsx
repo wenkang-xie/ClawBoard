@@ -7,6 +7,7 @@ import { AgentsPage } from './pages/AgentsPage'
 import { SessionsPage } from './pages/SessionsPage'
 import { SessionDetailPage } from './pages/SessionDetailPage'
 import { TasksPage } from './pages/TasksPage'
+import { MemoryPage } from './pages/MemoryPage'
 import { SettingsPage } from './pages/SettingsPage'
 
 const queryClient = new QueryClient({
@@ -29,6 +30,7 @@ export default function App() {
               <Route path="agents" element={<AgentsPage />} />
               <Route path="sessions" element={<SessionsPage />} />
               <Route path="sessions/:sessionKey" element={<SessionDetailPage />} />
+              <Route path="memory" element={<MemoryPage />} />
               <Route path="tasks" element={<TasksPage />} />
               <Route path="settings" element={<SettingsPage />} />
             </Route>
