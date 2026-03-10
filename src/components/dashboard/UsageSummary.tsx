@@ -1,225 +1,441 @@
-import { useState, useMemo } from 'react'
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
-import { UsageData } from '../../hooks/useUsage'
-import { formatTokens, formatCost, formatRelativeTime, calculatePercentChange } from '../../lib/utils'
+import { useMemo, useState } from 'react'
+import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { AgentUsageAggregate, ModelUsageAggregate, SessionUsage, UsageData } from '../../hooks/useUsage'
+import { calculatePercentChange, formatCost, formatDateShort, formatTokens, getAgentColor } from '../../lib/utils'
+import { RefreshStatus } from '../shared/RefreshStatus'
+
+type RangeValue = 7 | 14 | 30 | 'all'
 
 interface UsageSummaryProps {
   usage: UsageData
+  lastUpdated?: number
+  isRefetching?: boolean
+  onManualRefresh?: () => void
+  autoRefreshInterval?: number
+  errorMessage?: string
 }
 
-interface TooltipPayload {
-  value: number
-  name: string
-  color: string
-}
-
-interface CustomTooltipProps {
-  active?: boolean
-  payload?: TooltipPayload[]
-  label?: string
-}
-
-function CustomTooltip({ active, payload, label }: CustomTooltipProps) {
-  if (!active || !payload?.length) return null
-  return (
-    <div className="bg-gray-800 border border-gray-700 rounded-lg p-3 text-xs">
-      <p className="text-gray-400 mb-1">{label}</p>
-      {payload.map((p) => (
-        <p key={p.name} style={{ color: p.color }}>
-          {p.name === 'tokens' ? formatTokens(p.value) + ' tokens' : formatCost(p.value / 100)}
-        </p>
-      ))}
-    </div>
-  )
-}
-
-// 日期范围选项
-const DATE_RANGE_OPTIONS = [
-  { label: '7天', value: 7 },
-  { label: '14天', value: 14 },
-  { label: '30天', value: 30 },
-]
-
-// Mini model breakdown item
-function ModelBreakdownItem({ model, provider, tokens, cost, totalTokens }: {
-  model: string
-  provider: string
+interface ChartPoint {
+  date: string
+  fullDate: string
   tokens: number
   cost: number
-  totalTokens: number
+}
+
+const DATE_RANGE_OPTIONS: Array<{ label: string; value: RangeValue }> = [
+  { label: '7d', value: 7 },
+  { label: '14d', value: 14 },
+  { label: '30d', value: 30 },
+  { label: 'All', value: 'all' },
+]
+
+function parseAgentIdFromSessionKey(sessionKey?: string): string {
+  if (!sessionKey) return 'unknown'
+  const parts = sessionKey.split(':')
+  if (parts[0] === 'agent' && parts[1]) return parts[1]
+  return 'unknown'
+}
+
+function toDateKey(timestamp?: number): string | null {
+  if (!timestamp || Number.isNaN(timestamp)) return null
+  return new Date(timestamp).toISOString().slice(0, 10)
+}
+
+function formatRangeLabel(range: RangeValue, itemCount: number): string {
+  if (range === 'all') return itemCount > 0 ? `全部 ${itemCount} 天` : '全部'
+  return `最近 ${range} 天`
+}
+
+function formatModelName(model: string): string {
+  return model.includes('/') ? model.split('/').pop() || model : model
+}
+
+function buildWindowModelBreakdown(
+  sessions: SessionUsage[],
+  dateSet: Set<string> | null,
+  fallback: ModelUsageAggregate[]
+): { items: ModelUsageAggregate[]; precise: boolean } {
+  if (!dateSet) {
+    return { items: fallback, precise: true }
+  }
+
+  const modelMap = new Map<string, ModelUsageAggregate>()
+
+  for (const session of sessions) {
+    for (const modelUsage of session.usage.dailyModelUsage || []) {
+      if (!dateSet.has(modelUsage.date)) continue
+      const key = `${modelUsage.provider}:${modelUsage.model}`
+      const existing = modelMap.get(key) || {
+        provider: modelUsage.provider,
+        model: modelUsage.model,
+        tokens: 0,
+        cost: 0,
+        count: 0,
+      }
+
+      modelMap.set(key, {
+        provider: modelUsage.provider,
+        model: modelUsage.model,
+        tokens: existing.tokens + modelUsage.tokens,
+        cost: existing.cost + modelUsage.cost,
+        count: (existing.count || 0) + (modelUsage.count || 0),
+      })
+    }
+  }
+
+  const items = [...modelMap.values()].sort((a, b) => b.tokens - a.tokens)
+  if (items.length === 0) {
+    return { items: fallback, precise: false }
+  }
+
+  return { items, precise: true }
+}
+
+function buildWindowAgentBreakdown(
+  sessions: SessionUsage[],
+  dateSet: Set<string> | null,
+  fallback: AgentUsageAggregate[]
+): { items: AgentUsageAggregate[]; precise: boolean } {
+  if (!dateSet) {
+    return { items: fallback, precise: true }
+  }
+
+  const agentMap = new Map<string, AgentUsageAggregate>()
+
+  for (const session of sessions) {
+    const agentId = session.agentId || parseAgentIdFromSessionKey(session.key)
+    let tokens = 0
+    let cost = 0
+
+    for (const day of session.usage.dailyBreakdown || []) {
+      if (!dateSet.has(day.date)) continue
+      tokens += day.tokens
+      cost += day.cost
+    }
+
+    if (tokens === 0 && cost === 0) {
+      const fallbackDate = toDateKey(session.usage.lastActivity || session.updatedAt)
+      if (fallbackDate && dateSet.has(fallbackDate)) {
+        tokens = session.usage.totalTokens || 0
+        cost = session.usage.totalCost || 0
+      }
+    }
+
+    if (tokens === 0 && cost === 0) continue
+
+    const existing = agentMap.get(agentId) || { agentId, tokens: 0, cost: 0, sessions: 0, lastActivity: 0 }
+    agentMap.set(agentId, {
+      agentId,
+      tokens: existing.tokens + tokens,
+      cost: existing.cost + cost,
+      sessions: existing.sessions + 1,
+      lastActivity: Math.max(existing.lastActivity || 0, session.usage.lastActivity || session.updatedAt || 0),
+    })
+  }
+
+  const items = [...agentMap.values()].sort((a, b) => b.tokens - a.tokens)
+  if (items.length === 0) {
+    return { items: fallback, precise: false }
+  }
+
+  return { items, precise: true }
+}
+
+function SummaryMetric({
+  label,
+  value,
+  delta,
+  detail,
+}: {
+  label: string
+  value: string
+  delta?: string | null
+  detail?: string
 }) {
-  const percent = totalTokens > 0 ? Math.round((tokens / totalTokens) * 100) : 0
-  
-  // 简化 model 名称显示
-  const displayModel = model.includes('/') ? model.split('/').pop() : model
-  
   return (
-    <div className="flex items-center gap-2 py-1.5">
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-1.5">
-          <span className="text-xs text-gray-300 truncate">{displayModel}</span>
-          <span className="text-xs text-gray-600">·</span>
-          <span className="text-xs text-gray-500">{provider}</span>
-        </div>
-        <div className="mt-0.5 h-1 bg-gray-800 rounded-full overflow-hidden">
-          <div 
-            className="h-full bg-indigo-500 rounded-full transition-all duration-300" 
-            style={{ width: `${percent}%` }}
-          />
-        </div>
+    <div className="rounded-xl border border-gray-800 bg-gray-950/60 px-4 py-3">
+      <p className="text-xs uppercase tracking-[0.18em] text-gray-500">{label}</p>
+      <div className="mt-2 flex items-end gap-2">
+        <p className="text-2xl font-semibold text-white">{value}</p>
+        {delta && <span className="pb-1 text-xs text-gray-400">{delta}</span>}
       </div>
-      <span className="text-xs text-gray-400 whitespace-nowrap">{percent}%</span>
+      {detail && <p className="mt-1 text-xs text-gray-600">{detail}</p>}
     </div>
   )
 }
 
-// Trend indicator component
-function TrendIndicator({ current, previous, type = 'tokens' }: { 
-  current: number
-  previous: number
-  type?: 'tokens' | 'cost'
+function BreakdownRow({
+  label,
+  sublabel,
+  value,
+  percent,
+  barColor,
+}: {
+  label: string
+  sublabel: string
+  value: string
+  percent: number
+  barColor: string
 }) {
-  const percent = calculatePercentChange(current, previous)
-  
-  if (percent === null) return null
-  
-  const isUp = percent > 0
-  const isNeutral = percent === 0
-  
   return (
-    <span className={`text-xs ml-2 ${isNeutral ? 'text-gray-500' : isUp ? 'text-yellow-400' : 'text-green-400'}`}>
-      {isNeutral ? '→' : isUp ? '↑' : '↓'}{Math.abs(percent)}%
-    </span>
+    <div className="rounded-lg border border-gray-800 bg-gray-950/50 p-3">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="truncate text-sm font-medium text-white">{label}</p>
+          <p className="truncate text-xs text-gray-500">{sublabel}</p>
+        </div>
+        <div className="text-right">
+          <p className="text-sm text-gray-200">{value}</p>
+          <p className="text-xs text-gray-500">{percent}%</p>
+        </div>
+      </div>
+      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-gray-800">
+        <div className="h-full rounded-full transition-all duration-300" style={{ width: `${percent}%`, backgroundColor: barColor }} />
+      </div>
+    </div>
   )
 }
 
-export function UsageSummary({ usage }: UsageSummaryProps) {
-  const [dateRange, setDateRange] = useState(14)
-  
-  // Filter data based on date range
-  const chartData = useMemo(() => {
-    const daily = usage.dailyAggregated || []
-    return daily.slice(-dateRange).map(d => ({
-      date: d.date.slice(5), // MM-DD
-      tokens: d.tokens,
-      cost_cents: Math.round((d.cost || 0) * 100),
-    }))
-  }, [usage.dailyAggregated, dateRange])
+export function UsageSummary({
+  usage,
+  lastUpdated,
+  isRefetching = false,
+  onManualRefresh,
+  autoRefreshInterval = 30_000,
+  errorMessage,
+}: UsageSummaryProps) {
+  const [range, setRange] = useState<RangeValue>(14)
 
-  const modelBreakdown = usage.modelBreakdown || []
-  const totalTokens = usage.totalTokens || 0
-  const totalCost = usage.totalCost || 0
-  const updatedAt = usage.updatedAt
+  const view = useMemo(() => {
+    const daily = usage.dailyAggregated || []
+    const filteredDaily = range === 'all' ? daily : daily.slice(-range)
+    const dateSet = range === 'all' ? null : new Set(filteredDaily.map(item => item.date))
+
+    const totalTokens = filteredDaily.reduce((sum, item) => sum + item.tokens, 0)
+    const totalCost = filteredDaily.reduce((sum, item) => sum + item.cost, 0)
+    const chartData: ChartPoint[] = filteredDaily.map(item => ({
+      date: formatDateShort(item.date),
+      fullDate: item.date,
+      tokens: item.tokens,
+      cost: item.cost,
+    }))
+
+    const currentWindowSize = filteredDaily.length
+    const previousWindow = range === 'all'
+      ? []
+      : daily.slice(Math.max(0, daily.length - currentWindowSize * 2), Math.max(0, daily.length - currentWindowSize))
+    const previousTokens = previousWindow.reduce((sum, item) => sum + item.tokens, 0)
+    const previousCost = previousWindow.reduce((sum, item) => sum + item.cost, 0)
+
+    const modelView = buildWindowModelBreakdown(usage.sessions || [], dateSet, usage.modelBreakdown || [])
+    const agentView = buildWindowAgentBreakdown(usage.sessions || [], dateSet, usage.agentBreakdown || [])
+
+    return {
+      chartData,
+      totalTokens,
+      totalCost,
+      previousTokens,
+      previousCost,
+      modelBreakdown: modelView.items,
+      agentBreakdown: agentView.items,
+      modelPrecise: modelView.precise,
+      agentPrecise: agentView.precise,
+      rangeLabel: formatRangeLabel(range, filteredDaily.length),
+    }
+  }, [range, usage])
+
+  const tokenDelta = calculatePercentChange(view.totalTokens, view.previousTokens)
+  const costDelta = calculatePercentChange(view.totalCost, view.previousCost)
+  const topModelShare = view.totalTokens > 0 && view.modelBreakdown[0]
+    ? Math.round((view.modelBreakdown[0].tokens / view.totalTokens) * 100)
+    : 0
+  const topAgentShare = view.totalTokens > 0 && view.agentBreakdown[0]
+    ? Math.round((view.agentBreakdown[0].tokens / view.totalTokens) * 100)
+    : 0
 
   return (
-    <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
-      {/* Header */}
-      <div className="flex items-start justify-between mb-4">
+    <div className="rounded-xl border border-gray-800 bg-gray-900 p-5">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <h3 className="text-base font-semibold text-white">消耗摘要</h3>
-          {updatedAt && (
-            <p className="text-xs text-gray-600 mt-0.5">
-              更新于 {formatRelativeTime(updatedAt)}
-            </p>
-          )}
-        </div>
-        
-        {/* Date range selector */}
-        <div className="flex gap-1">
-          {DATE_RANGE_OPTIONS.map(opt => (
-            <button
-              key={opt.value}
-              onClick={() => setDateRange(opt.value)}
-              className={`px-2 py-1 text-xs rounded transition-colors ${
-                dateRange === opt.value 
-                  ? 'bg-indigo-600 text-white' 
-                  : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
-              }`}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Summary stats row */}
-      <div className="flex items-baseline gap-6 mb-4">
-        <div>
-          <p className="text-sm text-gray-400">总 Token</p>
-          <p className="text-2xl font-bold text-white">
-            {formatTokens(totalTokens)}
-            <TrendIndicator 
-              current={totalTokens} 
-              previous={usage.previousPeriodTokens || 0} 
-              type="tokens" 
-            />
+          <h3 className="text-base font-semibold text-white">Token Dashboard</h3>
+          <p className="mt-1 text-sm text-gray-500">
+            {view.rangeLabel}内观察 token 趋势、模型分布和 agent 分布
           </p>
         </div>
-        {(totalCost || 0) > 0 && (
-          <div>
-            <p className="text-sm text-gray-400">总成本</p>
-            <p className="text-lg font-semibold text-green-500">
-              {formatCost(totalCost)}
-              <TrendIndicator 
-                current={totalCost} 
-                previous={usage.previousPeriodCost || 0} 
-                type="cost" 
-              />
-            </p>
-          </div>
-        )}
-      </div>
 
-      {/* Chart */}
-      {chartData.length > 0 ? (
-        <ResponsiveContainer width="100%" height={140}>
-          <BarChart data={chartData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#374151" vertical={false} />
-            <XAxis
-              dataKey="date"
-              tick={{ fontSize: 10, fill: '#6b7280' }}
-              axisLine={false}
-              tickLine={false}
-            />
-            <YAxis
-              tick={{ fontSize: 10, fill: '#6b7280' }}
-              axisLine={false}
-              tickLine={false}
-              tickFormatter={v => formatTokens(v as number)}
-            />
-            <Tooltip content={<CustomTooltip />} />
-            <Bar dataKey="tokens" fill="#6366f1" radius={[3, 3, 0, 0]} name="tokens" />
-          </BarChart>
-        </ResponsiveContainer>
-      ) : (
-        <div className="h-32 flex items-center justify-center text-gray-600 text-sm">
-          暂无使用数据
-        </div>
-      )}
+        <div className="flex flex-col items-start gap-3 lg:items-end">
+          <RefreshStatus
+            isRefetching={isRefetching}
+            lastUpdated={lastUpdated || usage.updatedAt}
+            onManualRefresh={onManualRefresh}
+            autoRefreshInterval={autoRefreshInterval}
+            degradedAfterMs={autoRefreshInterval * 3}
+            isDegraded={Boolean(errorMessage)}
+            degradedMessage={errorMessage}
+            idleLabel="等待首次拉取"
+          />
 
-      {/* Model breakdown - only show if we have data */}
-      {modelBreakdown.length > 0 && (
-        <div className="mt-4 pt-4 border-t border-gray-800">
-          <p className="text-xs text-gray-500 mb-2">Top Models</p>
-          <div className="space-y-0.5">
-            {modelBreakdown.slice(0, 3).map((m, i) => (
-              <ModelBreakdownItem
-                key={i}
-                model={m.model}
-                provider={m.provider}
-                tokens={m.tokens}
-                cost={m.cost}
-                totalTokens={totalTokens}
-              />
+          <div className="flex flex-wrap gap-1">
+            {DATE_RANGE_OPTIONS.map(option => (
+              <button
+                key={option.label}
+                onClick={() => setRange(option.value)}
+                className={`rounded-md px-2.5 py-1 text-xs transition-colors ${
+                  range === option.value
+                    ? 'bg-indigo-600 text-white'
+                    : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                }`}
+              >
+                {option.label}
+              </button>
             ))}
           </div>
         </div>
-      )}
+      </div>
 
-      {/* Date range footer */}
-      <p className="text-xs text-gray-600 mt-3 text-right">
-        数据范围：{usage.startDate} ~ {usage.endDate}
-      </p>
+      <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <SummaryMetric
+          label="Tokens"
+          value={formatTokens(view.totalTokens)}
+          delta={range === 'all' || tokenDelta === null ? null : `${tokenDelta > 0 ? '+' : ''}${tokenDelta}%`}
+          detail={range === 'all' ? '全量累计' : `对比前 ${range} 天`}
+        />
+        <SummaryMetric
+          label="Cost"
+          value={formatCost(view.totalCost)}
+          delta={range === 'all' || costDelta === null ? null : `${costDelta > 0 ? '+' : ''}${costDelta}%`}
+          detail={range === 'all' ? '全量累计成本' : '同窗口成本变化'}
+        />
+        <SummaryMetric
+          label="Models"
+          value={String(view.modelBreakdown.length)}
+          detail={view.modelBreakdown[0] ? `Top model ${topModelShare}%` : '暂无模型明细'}
+        />
+        <SummaryMetric
+          label="Agents"
+          value={String(view.agentBreakdown.length)}
+          detail={view.agentBreakdown[0] ? `Top agent ${topAgentShare}%` : '暂无 agent 明细'}
+        />
+      </div>
+
+      <div className="mt-5 grid gap-4 xl:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)_minmax(0,1fr)]">
+        <div className="rounded-xl border border-gray-800 bg-gray-950/50 p-4">
+          <div className="mb-3 flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-white">Trend Over Time</p>
+              <p className="text-xs text-gray-500">按天聚合 token 消耗</p>
+            </div>
+            <p className="text-xs text-gray-600">{view.chartData.length} points</p>
+          </div>
+
+          {view.chartData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={260}>
+              <AreaChart data={view.chartData} margin={{ top: 8, right: 8, left: -12, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="usageTrendFill" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#6366f1" stopOpacity={0.45} />
+                    <stop offset="95%" stopColor="#6366f1" stopOpacity={0.03} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid stroke="#1f2937" vertical={false} strokeDasharray="3 3" />
+                <XAxis
+                  dataKey="date"
+                  tick={{ fill: '#6b7280', fontSize: 11 }}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <YAxis
+                  tick={{ fill: '#6b7280', fontSize: 11 }}
+                  axisLine={false}
+                  tickLine={false}
+                  tickFormatter={value => formatTokens(Number(value))}
+                />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: '#111827',
+                    border: '1px solid #374151',
+                    borderRadius: '0.75rem',
+                  }}
+                  formatter={(value: number) => [`${formatTokens(value)} tokens`, 'Tokens']}
+                  labelFormatter={(_, payload) => payload?.[0]?.payload?.fullDate || ''}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="tokens"
+                  stroke="#818cf8"
+                  strokeWidth={2}
+                  fill="url(#usageTrendFill)"
+                  dot={false}
+                  activeDot={{ r: 4, fill: '#a5b4fc' }}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="flex h-[260px] items-center justify-center text-sm text-gray-600">
+              暂无 usage 趋势数据
+            </div>
+          )}
+        </div>
+
+        <div className="rounded-xl border border-gray-800 bg-gray-950/50 p-4">
+          <div className="mb-3">
+            <p className="text-sm font-medium text-white">By Model</p>
+            <p className="text-xs text-gray-500">
+              {view.modelPrecise ? '使用当前窗口内模型明细' : '缺少窗口级明细，回退到总聚合'}
+            </p>
+          </div>
+          <div className="space-y-2">
+            {view.modelBreakdown.slice(0, 5).map(model => {
+              const percent = view.totalTokens > 0 ? Math.max(1, Math.round((model.tokens / view.totalTokens) * 100)) : 0
+              return (
+                <BreakdownRow
+                  key={`${model.provider}:${model.model}`}
+                  label={formatModelName(model.model)}
+                  sublabel={`${model.provider} · ${formatCost(model.cost)}`}
+                  value={formatTokens(model.tokens)}
+                  percent={percent}
+                  barColor="#6366f1"
+                />
+              )
+            })}
+            {view.modelBreakdown.length === 0 && (
+              <p className="py-10 text-center text-sm text-gray-600">暂无模型维度数据</p>
+            )}
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-gray-800 bg-gray-950/50 p-4">
+          <div className="mb-3">
+            <p className="text-sm font-medium text-white">By Agent</p>
+            <p className="text-xs text-gray-500">
+              {view.agentPrecise ? '按 session 活动聚合到 agent' : '缺少窗口级明细，回退到总聚合'}
+            </p>
+          </div>
+          <div className="space-y-2">
+            {view.agentBreakdown.slice(0, 5).map(agent => {
+              const percent = view.totalTokens > 0 ? Math.max(1, Math.round((agent.tokens / view.totalTokens) * 100)) : 0
+              return (
+                <BreakdownRow
+                  key={agent.agentId}
+                  label={agent.agentId}
+                  sublabel={`${agent.sessions} sessions · ${formatCost(agent.cost)}`}
+                  value={formatTokens(agent.tokens)}
+                  percent={percent}
+                  barColor={getAgentColor(agent.agentId)}
+                />
+              )
+            })}
+            {view.agentBreakdown.length === 0 && (
+              <p className="py-10 text-center text-sm text-gray-600">暂无 agent 维度数据</p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-4 flex flex-col gap-1 text-xs text-gray-600 md:flex-row md:items-center md:justify-between">
+        <span>数据范围: {usage.startDate || '-'} ~ {usage.endDate || '-'}</span>
+        <span>Gateway updatedAt: {usage.updatedAt ? new Date(usage.updatedAt).toLocaleString('zh-CN') : '-'}</span>
+      </div>
     </div>
   )
 }

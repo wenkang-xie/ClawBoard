@@ -1,87 +1,30 @@
 import { useMemo } from 'react'
-import { RunRecord } from '../../hooks/useFileData'
+import { BffTask, RunRecord } from '../../hooks/useFileData'
 import { KanbanColumn } from './KanbanColumn'
 import { TaskCard } from './TaskCard'
 import { EmptyState } from '../shared/EmptyState'
 
-interface ParsedMdTask {
-  id: string
-  title: string
-  status: 'todo' | 'in_progress' | 'done' | 'blocked'
-  checkboxes: { text: string; checked: boolean }[]
-  rawText: string
-}
-
-function parseRunningTasksMd(md: string): ParsedMdTask[] {
-  const tasks: ParsedMdTask[] = []
-  
-  // Split by ## headers (TASK sections)
-  const sections = md.split(/(?=^##\s)/m).filter(s => s.trim())
-  
-  for (const section of sections) {
-    const lines = section.split('\n')
-    const headerLine = lines[0] || ''
-    const match = headerLine.match(/^##\s+(.+)/)
-    if (!match) continue
-    
-    const title = match[1].trim()
-    const id = `md-${title.replace(/\s+/g, '-').toLowerCase()}`
-    
-    // Parse checkboxes
-    const checkboxes: { text: string; checked: boolean }[] = []
-    for (const line of lines) {
-      const cbMatch = line.match(/^\s*-\s+\[([ xX])\]\s+(.+)/)
-      if (cbMatch) {
-        checkboxes.push({
-          checked: cbMatch[1] !== ' ',
-          text: cbMatch[2].trim(),
-        })
-      }
-    }
-    
-    // Determine status from content
-    let status: ParsedMdTask['status'] = 'todo'
-    const sectionLower = section.toLowerCase()
-    if (sectionLower.includes('**状态**: blocked') || sectionLower.includes('blocked')) {
-      status = 'blocked'
-    } else if (sectionLower.includes('**状态**: running') || sectionLower.includes('running')) {
-      status = 'in_progress'
-    } else if (sectionLower.includes('**状态**: done') || sectionLower.includes('done')) {
-      status = 'done'
-    } else if (checkboxes.length > 0) {
-      const checkedCount = checkboxes.filter(c => c.checked).length
-      if (checkedCount === checkboxes.length) status = 'done'
-      else if (checkedCount > 0) status = 'in_progress'
-      else status = 'todo'
-    }
-    
-    tasks.push({ id, title, status, checkboxes, rawText: section })
-  }
-  
-  return tasks
-}
-
 interface KanbanBoardProps {
   runs: Record<string, RunRecord>
-  tasksMd?: string
+  tasks?: BffTask[]
 }
 
-export function KanbanBoard({ runs, tasksMd }: KanbanBoardProps) {
+export function KanbanBoard({ runs, tasks = [] }: KanbanBoardProps) {
   const runList = useMemo(() => Object.values(runs), [runs])
-  const mdTasks = useMemo(() => tasksMd ? parseRunningTasksMd(tasksMd) : [], [tasksMd])
+  const parsedTasks = useMemo(() => tasks, [tasks])
 
   // Categorize runs
   const inProgress = runList.filter(r => !r.outcome || r.outcome.status === null)
   const done = runList.filter(r => r.outcome?.status === 'ok')
   const blocked = runList.filter(r => r.outcome?.status === 'error')
   
-  // Categorize md tasks
-  const mdTodo = mdTasks.filter(t => t.status === 'todo')
-  const mdInProgress = mdTasks.filter(t => t.status === 'in_progress')
-  const mdDone = mdTasks.filter(t => t.status === 'done')
-  const mdBlocked = mdTasks.filter(t => t.status === 'blocked')
+  // Categorize tasks
+  const taskTodo = parsedTasks.filter(t => t.status === 'todo')
+  const taskInProgress = parsedTasks.filter(t => t.status === 'in_progress')
+  const taskDone = parsedTasks.filter(t => t.status === 'done')
+  const taskBlocked = parsedTasks.filter(t => t.status === 'blocked')
 
-  const totalTasks = runList.length + mdTasks.length
+  const totalTasks = runList.length + parsedTasks.length
   if (totalTasks === 0) {
     return (
       <EmptyState
@@ -97,10 +40,10 @@ export function KanbanBoard({ runs, tasksMd }: KanbanBoardProps) {
       {/* Todo (MD only) */}
       <KanbanColumn
         title="待处理"
-        count={mdTodo.length}
+        count={taskTodo.length}
         color="bg-gray-400"
       >
-        {mdTodo.map(task => (
+        {taskTodo.map(task => (
           <TaskCard
             key={task.id}
             title={task.title}
@@ -113,10 +56,10 @@ export function KanbanBoard({ runs, tasksMd }: KanbanBoardProps) {
       {/* In Progress */}
       <KanbanColumn
         title="进行中"
-        count={inProgress.length + mdInProgress.length}
+        count={inProgress.length + taskInProgress.length}
         color="bg-blue-400"
       >
-        {mdInProgress.map(task => (
+        {taskInProgress.map(task => (
           <TaskCard
             key={task.id}
             title={task.title}
@@ -132,10 +75,10 @@ export function KanbanBoard({ runs, tasksMd }: KanbanBoardProps) {
       {/* Done */}
       <KanbanColumn
         title="已完成"
-        count={done.length + mdDone.length}
+        count={done.length + taskDone.length}
         color="bg-green-400"
       >
-        {mdDone.map(task => (
+        {taskDone.map(task => (
           <TaskCard
             key={task.id}
             title={task.title}
@@ -156,10 +99,10 @@ export function KanbanBoard({ runs, tasksMd }: KanbanBoardProps) {
       {/* Blocked */}
       <KanbanColumn
         title="失败/阻塞"
-        count={blocked.length + mdBlocked.length}
+        count={blocked.length + taskBlocked.length}
         color="bg-red-400"
       >
-        {mdBlocked.map(task => (
+        {taskBlocked.map(task => (
           <TaskCard
             key={task.id}
             title={task.title}

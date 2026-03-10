@@ -1,66 +1,80 @@
-import { useRunsJson, useRunningTasksMd } from '../hooks/useFileData'
+import { useMemo } from 'react'
+import { TASKS_POLLING_CONFIG, useBffTasks, useRunsJson } from '../hooks/useFileData'
 import { KanbanBoard } from '../components/tasks/KanbanBoard'
 import { LoadingSpinner } from '../components/shared/LoadingSpinner'
 import { RefreshStatus } from '../components/shared/RefreshStatus'
-import { useEffect, useState, useMemo } from 'react'
+
+function buildDegradedMessage(hasRunsError: boolean, hasTasksError: boolean): string | undefined {
+  if (hasRunsError && hasTasksError) return 'runs/tasks 刷新失败'
+  if (hasRunsError) return 'runs 刷新失败'
+  if (hasTasksError) return 'tasks 刷新失败'
+  return undefined
+}
 
 export function TasksPage() {
-  const { 
-    data: runsData, 
-    isLoading: runsLoading, 
+  const {
+    data: runsData,
+    isLoading: runsLoading,
     error: runsError,
     dataUpdatedAt: runsUpdatedAt,
     refetch: refetchRuns,
-    isRefetching: isRunsRefetching
+    isRefetching: isRunsRefetching,
   } = useRunsJson()
-  
-  const { 
-    data: tasksMd, 
-    isLoading: mdLoading, 
-    error: mdError,
-    dataUpdatedAt: mdUpdatedAt,
-    refetch: refetchMd,
-    isRefetching: isMdRefetching
-  } = useRunningTasksMd()
+
+  const {
+    data: tasksResponse,
+    isLoading: tasksLoading,
+    error: tasksError,
+    dataUpdatedAt: tasksUpdatedAt,
+    refetch: refetchTasks,
+    isRefetching: isTasksRefetching,
+  } = useBffTasks()
 
   const runs = runsData?.runs || {}
-  const loading = runsLoading && mdLoading
-  
-  // Combined refresh status
-  const isRefetching = isRunsRefetching || isMdRefetching
-  
-  // Use the most recent update time
+  const tasks = tasksResponse?.tasks || []
+  const loading = (runsLoading && !runsData) || (tasksLoading && !tasksResponse)
+  const isRefetching = isRunsRefetching || isTasksRefetching
+
   const lastUpdated = useMemo(() => {
-    const times = [runsUpdatedAt, mdUpdatedAt].filter(Boolean)
+    const times = [runsUpdatedAt, tasksUpdatedAt].filter(Boolean)
     return times.length > 0 ? Math.max(...times) : undefined
-  }, [runsUpdatedAt, mdUpdatedAt])
+  }, [runsUpdatedAt, tasksUpdatedAt])
 
   const handleManualRefresh = () => {
     refetchRuns()
-    refetchMd()
+    refetchTasks()
   }
+
+  const degradedMessage = buildDegradedMessage(Boolean(runsError), Boolean(tasksError))
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <h1 className="text-xl font-bold text-white">Tasks</h1>
           <p className="text-sm text-gray-500 mt-1">
-            任务看板 · {Object.keys(runs).length} 个 subagent 运行记录
+            自动轮询任务看板 · {Object.keys(runs).length} 个 subagent 运行记录 · {tasks.length} 个文档任务
           </p>
         </div>
-        
-        {/* Refresh status */}
-        <RefreshStatus 
-          isRefetching={isRefetching}
-          lastUpdated={lastUpdated}
-          onManualRefresh={handleManualRefresh}
-          autoRefreshInterval={15_000}
-        />
+
+        <div className="flex flex-col items-start gap-2 rounded-lg border border-gray-800 bg-gray-900/70 px-3 py-2 lg:items-end">
+          <RefreshStatus
+            isRefetching={isRefetching}
+            lastUpdated={lastUpdated}
+            onManualRefresh={handleManualRefresh}
+            autoRefreshInterval={TASKS_POLLING_CONFIG.runsIntervalMs}
+            degradedAfterMs={TASKS_POLLING_CONFIG.degradedAfterMs}
+            isDegraded={Boolean(degradedMessage)}
+            degradedMessage={degradedMessage}
+            idleLabel="轮询已启动"
+          />
+          <p className="text-xs text-gray-600">
+            runs {TASKS_POLLING_CONFIG.runsIntervalMs / 1000}s · tasks {TASKS_POLLING_CONFIG.tasksIntervalMs / 1000}s · stale {TASKS_POLLING_CONFIG.runsStaleTimeMs / 1000}s/{TASKS_POLLING_CONFIG.tasksStaleTimeMs / 1000}s
+          </p>
+        </div>
       </div>
 
-      {/* Error notices */}
-      {(runsError || mdError) && (
+      {(runsError || tasksError) && (
         <div className="bg-red-900/20 border border-red-800 rounded-lg p-3 flex items-start gap-2">
           <span className="text-red-400">⚠</span>
           <div className="text-sm">
@@ -69,25 +83,26 @@ export function TasksPage() {
                 runs.json: {runsError instanceof Error ? runsError.message : String(runsError)}
               </p>
             )}
-            {mdError && (
+            {tasksError && (
               <p className="text-yellow-400 mt-1">
-                running_tasks.md: {mdError instanceof Error ? mdError.message : String(mdError)}
+                tasks: {tasksError instanceof Error ? tasksError.message : String(tasksError)}
               </p>
             )}
+            <p className="text-xs text-gray-500 mt-2">
+              React Query 保留默认 2 次重试与指数退避；当前会继续轮询可用数据源。
+            </p>
           </div>
         </div>
       )}
 
-      {/* Loading state */}
       {loading ? (
         <LoadingSpinner size="lg" message="加载任务数据..." />
       ) : (
-        <KanbanBoard runs={runs} tasksMd={tasksMd} />
+        <KanbanBoard runs={runs} tasks={tasks} />
       )}
-      
-      {/* Footer info */}
+
       <div className="flex items-center justify-between text-xs text-gray-600">
-        <span>自动刷新: 15秒 (runs) / 30秒 (tasks)</span>
+        <span>自动刷新已开启，无需手动 reload 才能看到 runs/tasks 变化</span>
         {Object.keys(runs).length > 0 && (
           <span>共 {Object.keys(runs).length} 条运行记录</span>
         )}

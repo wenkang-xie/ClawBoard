@@ -2,6 +2,14 @@ import { useQuery } from '@tanstack/react-query'
 
 const BFF_BASE = 'http://127.0.0.1:18902'
 
+export const TASKS_POLLING_CONFIG = {
+  runsIntervalMs: 10_000,
+  tasksIntervalMs: 15_000,
+  runsStaleTimeMs: 8_000,
+  tasksStaleTimeMs: 12_000,
+  degradedAfterMs: 45_000,
+} as const
+
 export interface RunRecord {
   runId: string
   childSessionKey: string
@@ -72,10 +80,9 @@ export function useRunsJson() {
       if (!data.ok) throw new Error(data.warnings?.[0] || 'BFF runs error')
       return data.data || { version: 1, runs: {} }
     },
-    refetchInterval: 15_000,
+    refetchInterval: TASKS_POLLING_CONFIG.runsIntervalMs,
     refetchIntervalInBackground: false,
-    retry: 1,
-    staleTime: 10_000,
+    staleTime: TASKS_POLLING_CONFIG.runsStaleTimeMs,
   })
 }
 
@@ -92,10 +99,9 @@ export function useRunningTasksMd() {
       // Return raw markdown reconstructed from tasks (for existing KanbanBoard parser)
       return data.tasks.map(t => t.rawText).join('\n\n')
     },
-    refetchInterval: 30_000,
+    refetchInterval: TASKS_POLLING_CONFIG.tasksIntervalMs,
     refetchIntervalInBackground: false,
-    retry: 1,
-    staleTime: 25_000,
+    staleTime: TASKS_POLLING_CONFIG.tasksStaleTimeMs,
   })
 }
 
@@ -109,9 +115,8 @@ export function useBffTasks() {
       if (!resp.ok) throw new Error(`BFF /api/tasks HTTP ${resp.status}`)
       return resp.json() as Promise<BffTasksResponse>
     },
-    refetchInterval: 30_000,
+    refetchInterval: TASKS_POLLING_CONFIG.tasksIntervalMs,
     refetchIntervalInBackground: false,
-    retry: 1,
-    staleTime: 25_000,
+    staleTime: TASKS_POLLING_CONFIG.tasksStaleTimeMs,
   })
 }

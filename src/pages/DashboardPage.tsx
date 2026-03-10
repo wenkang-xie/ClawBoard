@@ -1,6 +1,6 @@
 import { useHealth } from '../hooks/useHealth'
 import { useSessions } from '../hooks/useSessions'
-import { useUsage } from '../hooks/useUsage'
+import { USAGE_POLL_INTERVAL_MS, useUsage } from '../hooks/useUsage'
 import { useGatewayContext } from '../hooks/useGateway'
 import { GatewayCard } from '../components/dashboard/GatewayCard'
 import { AgentOverview } from '../components/dashboard/AgentOverview'
@@ -11,7 +11,14 @@ export function DashboardPage() {
   const { store, connectionState } = useGatewayContext()
   const { data: health, isLoading: healthLoading, error: healthError } = useHealth()
   const { data: sessions } = useSessions()
-  const { data: usage, isLoading: usageLoading } = useUsage()
+  const {
+    data: usage,
+    isLoading: usageLoading,
+    error: usageError,
+    dataUpdatedAt: usageUpdatedAt,
+    isRefetching: isUsageRefetching,
+    refetch: refetchUsage,
+  } = useUsage()
 
   const activeGateway = store.gateways.find(g => g.id === store.activeGatewayId)
 
@@ -50,6 +57,14 @@ export function DashboardPage() {
         </div>
       )}
 
+      {usageError && !usage && (
+        <div className="bg-amber-900/20 border border-amber-800 rounded-lg p-4">
+          <p className="text-sm text-amber-300">
+            获取 usage 数据失败：{usageError instanceof Error ? usageError.message : String(usageError)}
+          </p>
+        </div>
+      )}
+
       {/* Gateway Cards */}
       {healthLoading && !health ? (
         <LoadingSpinner message="加载 Gateway 状态..." />
@@ -62,22 +77,32 @@ export function DashboardPage() {
         </div>
       ) : null}
 
-      {/* Two-column grid: Agent Overview + Usage */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)]">
+        {usageLoading && !usage ? (
+          <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
+            <LoadingSpinner message="加载消耗数据..." />
+          </div>
+        ) : usage ? (
+          <UsageSummary
+            usage={usage}
+            lastUpdated={usageUpdatedAt}
+            isRefetching={isUsageRefetching}
+            onManualRefresh={() => { void refetchUsage() }}
+            autoRefreshInterval={USAGE_POLL_INTERVAL_MS}
+            errorMessage={usageError instanceof Error ? usageError.message : undefined}
+          />
+        ) : (
+          <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
+            <p className="text-sm text-gray-500">暂无 usage 数据</p>
+          </div>
+        )}
+
         {health?.agents && (
           <AgentOverview
             agents={health.agents}
             sessions={sessions?.sessions || []}
           />
         )}
-
-        {usageLoading && !usage ? (
-          <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
-            <LoadingSpinner message="加载消耗数据..." />
-          </div>
-        ) : usage ? (
-          <UsageSummary usage={usage} />
-        ) : null}
       </div>
     </div>
   )

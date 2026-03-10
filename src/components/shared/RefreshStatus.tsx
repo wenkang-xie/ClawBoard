@@ -5,13 +5,21 @@ interface RefreshStatusProps {
   lastUpdated?: number
   onManualRefresh?: () => void
   autoRefreshInterval?: number // in ms
+  isDegraded?: boolean
+  degradedAfterMs?: number
+  degradedMessage?: string
+  idleLabel?: string
 }
 
 export function RefreshStatus({ 
   isRefetching, 
   lastUpdated, 
   onManualRefresh,
-  autoRefreshInterval = 30_000 
+  autoRefreshInterval = 30_000,
+  isDegraded = false,
+  degradedAfterMs,
+  degradedMessage,
+  idleLabel,
 }: RefreshStatusProps) {
   const [now, setNow] = useState(Date.now())
   
@@ -21,8 +29,11 @@ export function RefreshStatus({
     return () => clearInterval(interval)
   }, [])
 
-  const timeAgo = lastUpdated ? Math.floor((now - lastUpdated) / 1000) : null
-  const secondsAgo = timeAgo !== null && timeAgo >= 0 ? timeAgo : null
+  const timeAgo = lastUpdated ? Math.floor(Math.max(0, now - lastUpdated) / 1000) : null
+  const secondsAgo = timeAgo !== null ? timeAgo : null
+  const ageMs = secondsAgo !== null ? secondsAgo * 1000 : null
+  const staleDegraded = degradedAfterMs !== undefined && ageMs !== null && ageMs > degradedAfterMs
+  const showDegraded = isDegraded || staleDegraded
   
   // Calculate auto-refresh progress (visual indicator)
   const refreshProgress = secondsAgo !== null 
@@ -45,20 +56,27 @@ export function RefreshStatus({
             <div className="w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
             <span className="text-xs text-blue-400">刷新中...</span>
           </>
+        ) : showDegraded ? (
+          <>
+            <div className="w-2 h-2 rounded-full bg-amber-400" />
+            <span className="text-xs text-amber-300">
+              {degradedMessage || '刷新降级'}
+            </span>
+          </>
         ) : (
           <>
             <div className="w-2 h-2 rounded-full bg-green-400" />
             <span className="text-xs text-gray-500">
               {secondsAgo !== null 
-                ? `${formatTimeAgo(secondsAgo)}更新` 
-                : '自动刷新中'}
+                ? `${formatTimeAgo(secondsAgo)}更新`
+                : (idleLabel || '自动刷新中')}
             </span>
           </>
         )}
       </div>
 
       {/* Progress bar showing time until next refresh */}
-      {!isRefetching && secondsAgo !== null && secondsAgo < (autoRefreshInterval / 1000) && (
+      {!isRefetching && !showDegraded && secondsAgo !== null && secondsAgo < (autoRefreshInterval / 1000) && (
         <div className="w-16 h-1 bg-gray-800 rounded-full overflow-hidden">
           <div 
             className="h-full bg-indigo-500 transition-all duration-1000 ease-linear"

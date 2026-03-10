@@ -39,6 +39,8 @@ function parseTasksMd(md) {
     if (!match) continue
 
     const title = match[1].trim()
+    if (!title.startsWith('[TASK-')) continue
+
     const id = `md-${title.replace(/[^\w]+/g, '-').toLowerCase()}`
 
     // Parse key-value meta lines
