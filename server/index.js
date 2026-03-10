@@ -8,13 +8,14 @@ import { promisify } from 'util'
 
 const execFileAsync = promisify(execFile)
 
-const PORT = 18902
-const OPENCLAW_HOME = path.join(
-  process.env.HOME || '/Users/wenkang',
-  '.openclaw'
-)
-const WORKSPACE_DIR = path.join(OPENCLAW_HOME, 'workspace')
-const TASKS_FILE = path.join(WORKSPACE_DIR, 'tasks/running_tasks.md')
+// BFF Server Configuration
+const PORT = Number(process.env.BFF_PORT) || 18902
+const BFF_HOST = process.env.BFF_HOST || '127.0.0.1'
+
+// OpenClaw Configuration
+const OPENCLAW_HOME = process.env.OPENCLAW_HOME || path.join(process.env.HOME || '/Users/wenkang', '.openclaw')
+const WORKSPACE_DIR = process.env.WORKSPACE_DIR || path.join(OPENCLAW_HOME, 'workspace')
+const TASKS_FILE = process.env.TASKS_FILE || path.join(WORKSPACE_DIR, 'tasks/running_tasks.md')
 const MEMORY_DIR = path.join(WORKSPACE_DIR, 'memory')
 const MEMORY_INDEX_FILE = path.join(WORKSPACE_DIR, 'MEMORY.md')
 const SUBAGENT_RUNS_FILE = path.join(OPENCLAW_HOME, 'subagents/runs.json')
@@ -1565,8 +1566,8 @@ const server = http.createServer(async (req, res) => {
   apiError(res, 404, 'NOT_FOUND', `Not found: ${pathname}`)
 })
 
-server.listen(PORT, '127.0.0.1', () => {
-  console.log(`✅ BFF running at http://127.0.0.1:${PORT}`)
+server.listen(PORT, BFF_HOST, () => {
+  console.log(`✅ BFF running at http://${BFF_HOST}:${PORT}`)
   console.log(`   GET  /api/tasks`)
   console.log(`   POST /api/tasks`)
   console.log(`   GET  /api/memory                              (legacy)`)

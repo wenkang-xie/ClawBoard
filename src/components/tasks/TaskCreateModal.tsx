@@ -1,6 +1,5 @@
 import { type FormEvent, useMemo, useState } from 'react'
-
-const BFF_BASE = 'http://127.0.0.1:18902'
+import { BFF_BASE } from '../../lib/config'
 
 interface TaskCreateModalProps {
   isOpen: boolean

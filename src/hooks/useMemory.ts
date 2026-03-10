@@ -1,6 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-
-const BFF_BASE = 'http://127.0.0.1:18902'
+import { BFF_BASE } from '../lib/config'
 
 export type MemoryCategory = 'index' | 'daily' | 'catalog' | 'archive' | 'note'
 

@@ -1,6 +1,7 @@
 // 多 Gateway 状态管理（localStorage 持久化）
 
 import { GatewayConfig } from './gateway'
+import { GATEWAY_WS_URL, GATEWAY_TOKEN } from './config'
 
 const STORAGE_KEY = 'agent-dashboard-gateways'
 
@@ -14,8 +15,8 @@ const DEFAULT_STORE: GatewayStore = {
   gateways: [
     {
       id: 'local',
-      url: 'ws://localhost:18789',
-      token: '7bb596c787ae6113d889f5a3cc5809022df281e3b95539ac',
+      url: GATEWAY_WS_URL,
+      token: GATEWAY_TOKEN || '7bb596c787ae6113d889f5a3cc5809022df281e3b95539ac',
       label: '本机',
     },
   ],

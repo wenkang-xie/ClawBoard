@@ -1,7 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { SessionData, SessionMessage } from './useSessions'
-
-const BFF_BASE = 'http://127.0.0.1:18902'
+import { BFF_BASE } from '../lib/config'
 
 export interface SessionRelationSessionSummary {
   key: string

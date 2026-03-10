@@ -22,6 +22,9 @@ OpenClaw 多 Agent 管理端，可视化监控 Agent 运行状态、任务与记
 ### 开发模式
 
 ```bash
+# 复制环境配置文件
+cp .env.example .env
+
 # 终端1：BFF（必须）
 npm run bff
 
@@ -31,6 +34,19 @@ npm run dev
 
 - 前端：http://127.0.0.1:5173
 - BFF：http://127.0.0.1:18902
+
+### 配置
+
+项目使用环境变量配置，复制 `.env.example` 后根据需要修改：
+
+| 变量 | 默认值 | 说明 |
+|------|--------|------|
+| `VITE_BFF_BASE` | `http://127.0.0.1:18902` | BFF 服务地址 |
+| `VITE_GATEWAY_WS_URL` | `ws://localhost:18789` | Gateway WebSocket |
+| `BFF_PORT` | `18902` | BFF 服务端口 |
+| `OPENCLAW_HOME` | `~/.openclaw` | OpenClaw 根目录 |
+
+> 注意：前端使用 `VITE_` 前缀的环境变量（Vite 要求）。
 
 ### 生产构建
 
