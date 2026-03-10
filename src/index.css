@@ -43,14 +43,17 @@
     --primary-glow: rgba(59, 130, 246, 0.1);
   }
 
-  body {
-    @apply bg-gray-950 text-gray-100 antialiased;
-    background-color: var(--bg-primary);
-    color: var(--text-primary);
+  html {
+    color-scheme: dark;
   }
   
-  body.light {
-    @apply bg-slate-50 text-slate-900;
+  html.light {
+    color-scheme: light;
+  }
+  
+  body {
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
   }
   
   /* Focus ring */
@@ -106,7 +109,7 @@
     @apply shadow-lg shadow-black/20;
   }
   .light .card-hover:hover {
-    @apply shadow-lg shadow-slate-200/50;
+    box-shadow: 0 10px 15px -3px rgb(203 213 225 / 0.5);
   }
   
   /* Subtle gradient background */

@@ -8,13 +8,40 @@ export default {
   theme: {
     extend: {
       colors: {
+        // Map Tailwind colors to CSS variables for automatic dark/light switching
+        gray: {
+          50: 'var(--text-primary)',
+          100: 'var(--text-primary)',
+          200: 'var(--text-secondary)',
+          300: 'var(--text-secondary)',
+          400: 'var(--text-muted)',
+          500: 'var(--text-dim)',
+          600: 'var(--text-dim)',
+          700: 'var(--border-hover)',
+          800: 'var(--bg-tertiary)',
+          900: 'var(--bg-secondary)',
+          950: 'var(--bg-primary)',
+        },
+        slate: {
+          50: 'var(--text-primary)',
+          100: 'var(--bg-tertiary)',
+          200: 'var(--border-default)',
+          300: 'var(--border-hover)',
+          400: 'var(--text-dim)',
+          500: 'var(--text-muted)',
+          600: 'var(--text-muted)',
+          700: 'var(--text-secondary)',
+          800: 'var(--bg-secondary)',
+          900: 'var(--text-primary)',
+          950: 'var(--bg-primary)',
+        },
         sidebar: {
-          DEFAULT: '#111827',
-          hover: '#1f2937',
-          active: '#374151',
-          light: '#f8fafc',
-          'light-hover': '#f1f5f9',
-          'light-active': '#e2e8f0',
+          DEFAULT: 'var(--bg-secondary)',
+          hover: 'var(--bg-tertiary)',
+          active: 'var(--border-hover)',
+          light: 'var(--bg-secondary)',
+          'light-hover': 'var(--bg-tertiary)',
+          'light-active': 'var(--border-hover)',
         },
         // OpenClaw red accent - used sparingly for tech feel
         accent: {
@@ -38,6 +65,27 @@ export default {
           muted: '#eff6ff',        // blue-50
           glow: 'rgba(59, 130, 246, 0.15)',
         },
+      },
+      backgroundColor: {
+        'primary': 'var(--bg-primary)',
+        'secondary': 'var(--bg-secondary)',
+        'tertiary': 'var(--bg-tertiary)',
+        'card': 'var(--bg-card)',
+        'card-hover': 'var(--bg-card-hover)',
+      },
+      textColor: {
+        'primary': 'var(--text-primary)',
+        'secondary': 'var(--text-secondary)',
+        'muted': 'var(--text-muted)',
+        'dim': 'var(--text-dim)',
+      },
+      borderColor: {
+        'default': 'var(--border-default)',
+        'hover': 'var(--border-hover)',
+      },
+      boxShadow: {
+        'glow-accent': '0 0 20px var(--accent-glow)',
+        'glow-primary': '0 0 20px var(--primary-glow)',
       },
       animation: {
         'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
