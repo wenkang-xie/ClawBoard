@@ -62,3 +62,14 @@ export function getStatusColor(status: string | null | undefined): string {
   if (status === 'error') return 'text-red-400'
   return 'text-yellow-400'
 }
+
+// 计算百分比变化
+export function calculatePercentChange(current: number, previous: number): number | null {
+  if (previous === 0 || previous === null || previous === undefined) return null
+  return Math.round(((current - previous) / previous) * 100)
+}
+
+// 格式化日期为 MM-DD
+export function formatDateShort(dateStr: string): string {
+  return dateStr.slice(5) // YYYY-MM-DD -> MM-DD
+}
