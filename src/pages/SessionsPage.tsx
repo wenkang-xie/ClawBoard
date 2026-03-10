@@ -25,16 +25,19 @@ export function SessionsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
+      <div className="flex items-center gap-3">
+        <div className="w-1 h-6 bg-gradient-to-b from-blue-500 to-cyan-500 rounded-full" />
+        <div className="flex-1">
           <h1 className="text-xl font-bold text-white">Sessions</h1>
-          <p className="text-sm text-gray-500 mt-1">
+          <p className="text-sm text-gray-500 mt-0.5">
             {sessionsData?.count ?? 0} 个 Sessions
             {defaultAgent && ` · 过滤: ${defaultAgent}`}
             {' · 行内可展开历史，右侧可进详情页'}
           </p>
         </div>
+      </div>
 
+      <div className="flex items-center justify-between">
         {/* View toggle */}
         <div className="flex bg-gray-800 rounded-lg p-1">
           <button

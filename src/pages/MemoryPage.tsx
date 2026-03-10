@@ -98,14 +98,14 @@ export function MemoryPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div>
+      <div className="flex items-center gap-3">
+        <div className="w-1 h-6 bg-gradient-to-b from-emerald-500 to-teal-500 rounded-full" />
+        <div className="flex-1">
           <h1 className="text-xl font-bold text-white">Memory</h1>
-          <p className="text-sm text-gray-500 mt-1">
+          <p className="text-sm text-gray-500 mt-0.5">
             多 Agent 记忆索引 + 预览区 · 当前 {selectedAgent?.label || selectedAgentId} · {files.length} 个文件 · 上次刷新 {formatRefreshTime(memoryQuery.dataUpdatedAt ?? undefined)}
           </p>
         </div>
-
         <div className="flex items-start gap-3 flex-wrap">
           <AgentSelector
             agents={agentsQuery.data?.agents || []}
@@ -116,7 +116,7 @@ export function MemoryPage() {
           <button
             type="button"
             onClick={refreshAll}
-            className="rounded border border-gray-700 px-3 py-1.5 text-xs text-gray-300 hover:bg-gray-800"
+            className="rounded border border-gray-700 px-3 py-1.5 text-xs text-gray-300 hover:bg-gray-800 transition-colors"
           >
             刷新
           </button>

@@ -14,7 +14,7 @@ export function GatewayCard({ health, gatewayLabel = '本机 Gateway' }: Gateway
   const totalSessions = agents.reduce((sum, a) => sum + (a.sessions?.count ?? 0), 0)
 
   return (
-    <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
+    <div className="bg-gray-900/80 border border-gray-800 rounded-xl p-5 card-hover">
       <div className="flex items-start justify-between mb-4">
         <div>
           <h3 className="text-base font-semibold text-white">{gatewayLabel}</h3>

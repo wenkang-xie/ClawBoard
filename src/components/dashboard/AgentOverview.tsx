@@ -33,7 +33,7 @@ export function AgentOverview({ agents, sessions }: AgentOverviewProps) {
   }
 
   return (
-    <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
+    <div className="bg-gray-900/80 border border-gray-800 rounded-xl p-5">
       <h3 className="text-base font-semibold text-white mb-4">Agent 快览</h3>
       <div className="space-y-3">
         {agents.map(agent => {

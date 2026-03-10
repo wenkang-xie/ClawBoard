@@ -9,9 +9,9 @@ interface MemoryStateBannerProps {
 
 const toneMap = {
   error: 'border-red-900/70 bg-red-950/30 text-red-200',
-  empty: 'border-gray-800 bg-gray-950/60 text-gray-300',
-  partial: 'border-yellow-900/60 bg-yellow-950/20 text-yellow-200',
-  stale: 'border-yellow-900/60 bg-yellow-950/20 text-yellow-200',
+  empty: 'border-gray-800 bg-gray-900/50 text-gray-300',
+  partial: 'border-amber-900/60 bg-amber-950/20 text-amber-200',
+  stale: 'border-amber-900/60 bg-amber-950/20 text-amber-200',
 } as const
 
 export function MemoryStateBanner({ type, title, description, action }: MemoryStateBannerProps) {

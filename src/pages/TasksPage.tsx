@@ -56,22 +56,22 @@ export function TasksPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-        <div>
+      <div className="flex items-center gap-3">
+        <div className="w-1 h-6 bg-gradient-to-b from-amber-500 to-orange-500 rounded-full" />
+        <div className="flex-1">
           <h1 className="text-xl font-bold text-white">Tasks</h1>
-          <p className="text-sm text-gray-500 mt-1">
+          <p className="text-sm text-gray-500 mt-0.5">
             自动轮询任务看板 · {Object.keys(runs).length} 个 subagent 运行记录 · {tasks.length} 个文档任务
           </p>
           <p className="mt-2 text-xs text-gray-600">
             新建入口会写入 <code>~/.openclaw/workspace/tasks/running_tasks.md</code>，随后由现有看板自动回显。
           </p>
         </div>
-
         <div className="flex flex-col items-start gap-2 lg:items-end">
           <button
             type="button"
             onClick={() => setCreateOpen(true)}
-            className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500"
+            className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 transition-colors"
           >
             + 新建文档任务
           </button>

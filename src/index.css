@@ -4,7 +4,12 @@
 
 @layer base {
   body {
-    @apply bg-gray-950 text-gray-100;
+    @apply bg-gray-950 text-gray-100 antialiased;
+  }
+  
+  /* Focus ring */
+  :focus-visible {
+    @apply outline-none ring-2 ring-indigo-500/50 ring-offset-2 ring-offset-gray-950;
   }
 }
 
@@ -25,4 +30,19 @@
 
 ::-webkit-scrollbar-thumb:hover {
   background: #4b5563;
+}
+
+/* Card hover effect */
+@layer utilities {
+  .card-hover {
+    @apply transition-all duration-200;
+  }
+  .card-hover:hover {
+    @apply -translate-y-0.5 shadow-lg shadow-black/20;
+  }
+  
+  /* Subtle gradient background */
+  .bg-gradient-subtle {
+    background: linear-gradient(180deg, rgba(30, 30, 40, 0.5) 0%, rgba(17, 17, 24, 0.5) 100%);
+  }
 }

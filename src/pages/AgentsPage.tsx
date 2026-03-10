@@ -25,11 +25,14 @@ export function AgentsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-bold text-white">Agents</h1>
-        <p className="text-sm text-gray-500 mt-1">
-          {agents.length} 个 Agent · 点击卡片查看 Sessions
-        </p>
+      <div className="flex items-center gap-3">
+        <div className="w-1 h-6 bg-gradient-to-b from-pink-500 to-rose-500 rounded-full" />
+        <div>
+          <h1 className="text-xl font-bold text-white">Agents</h1>
+          <p className="text-sm text-gray-500 mt-0.5">
+            {agents.length} 个 Agent · 点击卡片查看 Sessions
+          </p>
+        </div>
       </div>
 
       {agents.length === 0 ? (

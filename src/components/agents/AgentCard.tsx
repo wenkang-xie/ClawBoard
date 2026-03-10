@@ -22,7 +22,7 @@ export function AgentCard({ agent, sessions: allSessions }: AgentCardProps) {
 
   return (
     <div
-      className="bg-gray-900 border border-gray-800 rounded-xl p-5 cursor-pointer hover:border-gray-700 transition-colors group"
+      className="bg-gray-900/80 border border-gray-800 rounded-xl p-5 cursor-pointer card-hover group"
       onClick={() => navigate(`/sessions?agent=${agent.id}`)}
     >
       {/* Header */}

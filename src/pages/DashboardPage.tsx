@@ -45,9 +45,12 @@ export function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-bold text-white">Dashboard</h1>
-        <p className="text-sm text-gray-500 mt-1">实时监控 OpenClaw Agent 运行状态</p>
+      <div className="flex items-center gap-3">
+        <div className="w-1 h-6 bg-gradient-to-b from-indigo-500 to-purple-500 rounded-full" />
+        <div>
+          <h1 className="text-xl font-bold text-white">Dashboard</h1>
+          <p className="text-sm text-gray-500 mt-0.5">实时监控 OpenClaw Agent 运行状态</p>
+        </div>
       </div>
 
       {/* Error state */}

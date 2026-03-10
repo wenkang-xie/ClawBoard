@@ -56,9 +56,12 @@ export function SettingsPage() {
 
   return (
     <div className="space-y-8 max-w-2xl">
-      <div>
-        <h1 className="text-xl font-bold text-white">Settings</h1>
-        <p className="text-sm text-gray-500 mt-1">Gateway 连接管理与显示设置</p>
+      <div className="flex items-center gap-3">
+        <div className="w-1 h-6 bg-gradient-to-b from-gray-400 to-slate-500 rounded-full" />
+        <div>
+          <h1 className="text-xl font-bold text-white">Settings</h1>
+          <p className="text-sm text-gray-500 mt-0.5">Gateway 连接管理与显示设置</p>
+        </div>
       </div>
 
       {/* Gateway Management */}

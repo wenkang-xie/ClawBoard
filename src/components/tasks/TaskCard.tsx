@@ -33,7 +33,7 @@ export function TaskCard({ run, title, description, status: propStatus, checkbox
   const displayTitle = title || (run?.task ? run.task.slice(0, 60) + (run.task.length > 60 ? '…' : '') : '未知任务')
 
   return (
-    <div className="bg-gray-900 border border-gray-700/50 rounded-lg p-3 hover:border-gray-600 transition-colors">
+    <div className="bg-gray-900/80 border border-gray-700/50 rounded-lg p-3 card-hover">
       {/* Status + timing */}
       <div className="flex items-start justify-between gap-2 mb-2">
         <StatusBadge status={badgeStatus} size="sm" />
