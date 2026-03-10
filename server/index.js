@@ -19,29 +19,84 @@ const MEMORY_DIR = path.join(WORKSPACE_DIR, 'memory')
 const MEMORY_INDEX_FILE = path.join(WORKSPACE_DIR, 'MEMORY.md')
 const SUBAGENT_RUNS_FILE = path.join(OPENCLAW_HOME, 'subagents/runs.json')
 const AGENTS_DIR = path.join(OPENCLAW_HOME, 'agents')
-
-// Helper to get memory directory for a specific agent (or default workspace)
-function getMemoryDirForAgent(agentId) {
-  if (!agentId) return MEMORY_DIR
-  const agentMemoryDir = path.join(AGENTS_DIR, agentId, 'memory')
-  // Check if agent memory directory exists, fallback to default
-  if (fs.existsSync(agentMemoryDir)) {
-    return agentMemoryDir
-  }
-  return MEMORY_DIR
+const DEFAULT_MEMORY_AGENT_IDS = ['main', 'architect', 'research', 'designer']
+const MEMORY_AGENT_LABELS = {
+  main: 'Main',
+  architect: 'Architect',
+  research: 'Research',
+  designer: 'Designer',
+}
+const MEMORY_WORKSPACE_DIRS = {
+  main: WORKSPACE_DIR,
+  architect: path.join(OPENCLAW_HOME, 'workspace-architect'),
+  research: path.join(OPENCLAW_HOME, 'workspace-research'),
+  designer: path.join(OPENCLAW_HOME, 'workspace-designer'),
 }
 
-// Helper to get agents list
-function getAgentsList() {
+function getWorkspaceDirForAgent(agentId = 'main') {
+  return MEMORY_WORKSPACE_DIRS[agentId] || path.join(OPENCLAW_HOME, `workspace-${agentId}`)
+}
+
+function getSqliteFileForAgent(agentId = 'main') {
+  return path.join(OPENCLAW_HOME, 'memory', `${agentId}.sqlite`)
+}
+
+function buildMemoryAgentSource(rawAgentId = 'main') {
+  const agentId = String(rawAgentId || 'main').trim() || 'main'
+  const workspaceDir = getWorkspaceDirForAgent(agentId)
+  const memoryDir = path.join(workspaceDir, 'memory')
+  const indexFile = path.join(workspaceDir, 'MEMORY.md')
+  const sqliteFile = getSqliteFileForAgent(agentId)
+
+  const workspaceExists = fs.existsSync(workspaceDir)
+  const memoryDirExists = fs.existsSync(memoryDir)
+  const indexFileExists = fs.existsSync(indexFile)
+  const sqliteExists = fs.existsSync(sqliteFile)
+
+  const warnings = []
+  if (!workspaceExists) warnings.push(`workspace 不存在: ${workspaceDir}`)
+  if (!memoryDirExists) warnings.push(`memory 目录不存在: ${memoryDir}`)
+  if (!indexFileExists) warnings.push(`MEMORY.md 不存在: ${indexFile}`)
+  if (!sqliteExists) warnings.push(`sqlite 不存在: ${sqliteFile}`)
+  if (!memoryDirExists && !indexFileExists && !sqliteExists) {
+    warnings.push(`agent=${agentId} 当前没有可展示的 memory 数据来源`)
+  }
+
+  return {
+    agentId,
+    label: MEMORY_AGENT_LABELS[agentId] || agentId,
+    workspaceDir,
+    memoryDir,
+    indexFile,
+    sqliteFile,
+    workspaceExists,
+    memoryDirExists,
+    indexFileExists,
+    sqliteExists,
+    available: Boolean(memoryDirExists || indexFileExists || sqliteExists),
+    warnings,
+  }
+}
+
+function listMemoryAgentSources() {
+  const ids = new Set(DEFAULT_MEMORY_AGENT_IDS)
+
   try {
     const agents = fs.readdirSync(AGENTS_DIR, { withFileTypes: true })
-    return agents
-      .filter(a => a.isDirectory())
-      .map(a => a.name)
-      .sort()
+    for (const entry of agents) {
+      if (entry.isDirectory()) ids.add(entry.name)
+    }
   } catch {
-    return []
+    // ignore agent dir scan failure; defaults still work
   }
+
+  return [...ids]
+    .map(agentId => buildMemoryAgentSource(agentId))
+    .sort((a, b) => {
+      if (a.agentId === 'main') return -1
+      if (b.agentId === 'main') return 1
+      return a.agentId.localeCompare(b.agentId)
+    })
 }
 
 const SESSION_DETAIL_TTL_MS = 8_000
@@ -116,6 +171,104 @@ function parseTasksMd(md) {
   return tasks
 }
 
+function normalizeTaskStatus(rawStatus) {
+  const value = String(rawStatus || 'todo').trim().toLowerCase()
+  if (value === 'running' || value === 'in progress') return 'in_progress'
+  if (['todo', 'in_progress', 'blocked', 'done'].includes(value)) return value
+  return 'todo'
+}
+
+function normalizeTaskLines(rawValue, fallbackLines = []) {
+  if (Array.isArray(rawValue)) {
+    const lines = rawValue
+      .map(item => typeof item === 'string' ? item : item?.text)
+      .map(item => String(item || '').trim())
+      .filter(Boolean)
+    return lines.length > 0 ? lines : fallbackLines
+  }
+  if (typeof rawValue === 'string') {
+    const lines = rawValue.split('\n').map(item => item.trim()).filter(Boolean)
+    return lines.length > 0 ? lines : fallbackLines
+  }
+  return fallbackLines
+}
+
+function normalizeTaskTags(rawTags) {
+  const joined = Array.isArray(rawTags) ? rawTags.join(' ') : String(rawTags || '')
+  const parts = joined.split(/[\s,]+/).map(item => item.trim()).filter(Boolean)
+  const tags = parts.map(tag => tag.startsWith('#') ? tag : `#${tag}`)
+  return tags.length > 0 ? [...new Set(tags)] : ['#task']
+}
+
+function getShanghaiDateParts(date = new Date()) {
+  const formatter = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Shanghai',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  })
+  const parts = Object.fromEntries(
+    formatter
+      .formatToParts(date)
+      .filter(part => part.type !== 'literal')
+      .map(part => [part.type, part.value])
+  )
+
+  const year = parts.year || '0000'
+  const month = parts.month || '00'
+  const day = parts.day || '00'
+  const hour = parts.hour || '00'
+  const minute = parts.minute || '00'
+
+  return {
+    dateKey: `${year}${month}${day}`,
+    dateLabel: `${year}-${month}-${day}`,
+    dateTimeLabel: `${year}-${month}-${day} ${hour}:${minute}`,
+  }
+}
+
+function generateTaskId(existingMd, dateKey) {
+  const matches = [...String(existingMd || '').matchAll(/\[TASK-(\d{8})-(\d{3})\]/g)]
+  const seqs = matches
+    .filter(match => match[1] === dateKey)
+    .map(match => Number.parseInt(match[2], 10))
+    .filter(Number.isFinite)
+  const next = (seqs.length > 0 ? Math.max(...seqs) : 0) + 1
+  return `TASK-${dateKey}-${String(next).padStart(3, '0')}`
+}
+
+function buildTaskMarkdownEntry({ taskId, title, status, ownerAgent, priority, tags, due, inputs, deliverables, blockers, checkboxes, lastUpdate }) {
+  const lines = [
+    `## [${taskId}] ${title}`,
+    `- **Status**: ${status}`,
+    `- **Owner-Agent**: ${ownerAgent}`,
+    `- **Priority**: ${priority}`,
+    `- **Tags**: ${tags.join(' ')}`,
+    `- **Due**: ${due || '待定'}`,
+    '- **Inputs**:',
+    ...inputs.map(item => `  - ${item}`),
+    '- **Deliverables**:',
+    ...deliverables.map(item => `  - ${item}`),
+    '- **Blockers**:',
+    ...blockers.map(item => `  - ${item}`),
+    ...checkboxes.map(item => `- [ ] ${item}`),
+    `- **Last-Update**: ${lastUpdate}`,
+    '',
+    '--',
+  ]
+  return lines.join('\n')
+}
+
+function replaceNoActiveTaskHint(md) {
+  return String(md || '').replace(
+    '> 当前无活动中的文档任务；Sprint4 待重新排期后再进入 running。',
+    '> 当前活动任务以下方 TASK 区块为准。'
+  )
+}
+
 // ── Memory Directory Scanner ──────────────────────────────────────────────────
 
 // Extensions considered previewable as plain text
@@ -145,8 +298,8 @@ function memoryTagsOf(relativePath, name) {
   return [...new Set(tags.filter(Boolean))]
 }
 
-function buildMemoryFileNode(rootDir, filePath, stat) {
-  const relativePath = filePath === MEMORY_INDEX_FILE
+function buildMemoryFileNode(rootDir, filePath, stat, indexFile = MEMORY_INDEX_FILE) {
+  const relativePath = filePath === indexFile
     ? 'MEMORY.md'
     : path.relative(rootDir, filePath)
   const name = path.basename(filePath)
@@ -166,7 +319,7 @@ function buildMemoryFileNode(rootDir, filePath, stat) {
   }
 }
 
-function scanMemoryDir(dir) {
+function scanMemoryDir(dir, indexFile = MEMORY_INDEX_FILE) {
   const warnings = []
   const flatFiles = []
 
@@ -187,7 +340,7 @@ function scanMemoryDir(dir) {
       if (entry.isFile() && entry.name.endsWith('.md')) {
         try {
           const stat = fs.statSync(fullPath)
-          const fileNode = buildMemoryFileNode(dir, fullPath, stat)
+          const fileNode = buildMemoryFileNode(dir, fullPath, stat, indexFile)
           nodes.push(fileNode)
           flatFiles.push(fileNode)
         } catch (error) {
@@ -219,14 +372,14 @@ function scanMemoryDir(dir) {
   try {
     const files = walk(dir)
 
-    if (fs.existsSync(MEMORY_INDEX_FILE)) {
+    if (fs.existsSync(indexFile)) {
       try {
-        const stat = fs.statSync(MEMORY_INDEX_FILE)
-        const indexNode = buildMemoryFileNode(dir, MEMORY_INDEX_FILE, stat)
+        const stat = fs.statSync(indexFile)
+        const indexNode = buildMemoryFileNode(dir, indexFile, stat, indexFile)
         files.unshift(indexNode)
         flatFiles.unshift(indexNode)
       } catch (error) {
-        warnings.push(`stat failed: ${MEMORY_INDEX_FILE} -> ${String(error?.message || error)}`)
+        warnings.push(`stat failed: ${indexFile} -> ${String(error?.message || error)}`)
       }
     }
 
@@ -243,7 +396,7 @@ function scanMemoryDir(dir) {
 
 // ── Memory v1 Scanner (all file types) ───────────────────────────────────────
 
-function scanMemoryDirV1(dir) {
+function scanMemoryDirV1(dir, indexFile = MEMORY_INDEX_FILE) {
   const warnings = []
   const flatFiles = []
 
@@ -264,7 +417,7 @@ function scanMemoryDirV1(dir) {
       if (entry.isFile()) {
         try {
           const stat = fs.statSync(fullPath)
-          const fileNode = buildMemoryFileNode(dir, fullPath, stat)
+          const fileNode = buildMemoryFileNode(dir, fullPath, stat, indexFile)
           nodes.push(fileNode)
           flatFiles.push(fileNode)
         } catch (error) {
@@ -298,14 +451,14 @@ function scanMemoryDirV1(dir) {
   try {
     const tree = walk(dir)
 
-    if (fs.existsSync(MEMORY_INDEX_FILE)) {
+    if (fs.existsSync(indexFile)) {
       try {
-        const stat = fs.statSync(MEMORY_INDEX_FILE)
-        const indexNode = buildMemoryFileNode(dir, MEMORY_INDEX_FILE, stat)
+        const stat = fs.statSync(indexFile)
+        const indexNode = buildMemoryFileNode(dir, indexFile, stat, indexFile)
         tree.unshift(indexNode)
         flatFiles.unshift(indexNode)
       } catch (error) {
-        warnings.push(`stat failed: ${MEMORY_INDEX_FILE} -> ${String(error?.message || error)}`)
+        warnings.push(`stat failed: ${indexFile} -> ${String(error?.message || error)}`)
       }
     }
 
@@ -317,7 +470,10 @@ function scanMemoryDirV1(dir) {
 
 // ── Memory v1 Text Preview ────────────────────────────────────────────────────
 
-function readTextFilePreview(filePath, maxChars) {
+function readTextFilePreview(filePath, maxChars, options = {}) {
+  const memoryDir = options.memoryDir || MEMORY_DIR
+  const indexFile = options.indexFile || MEMORY_INDEX_FILE
+
   const stat = fs.statSync(filePath)
   if (!stat.isFile()) throw new Error('Not a file')
 
@@ -328,9 +484,9 @@ function readTextFilePreview(filePath, maxChars) {
   const preview = fullText.length > maxChars ? fullText.slice(0, maxChars) : fullText
   const lines = fullText.split('\n')
 
-  const relativePath = filePath === MEMORY_INDEX_FILE
+  const relativePath = filePath === indexFile
     ? 'MEMORY.md'
-    : path.relative(MEMORY_DIR, filePath)
+    : path.relative(memoryDir, filePath)
 
   const result = {
     path: filePath,
@@ -344,7 +500,6 @@ function readTextFilePreview(filePath, maxChars) {
     preview,
   }
 
-  // Enrich markdown files with headings + inline tags
   if (ext === '.md') {
     const headings = []
     for (const line of lines) {
@@ -372,27 +527,28 @@ function readTextFilePreview(filePath, maxChars) {
   return result
 }
 
-function resolveMemoryFilePath(rawPath) {
+function resolveMemoryFilePath(rawPath, options = {}) {
+  const memoryDir = options.memoryDir || MEMORY_DIR
+  const indexFile = options.indexFile || MEMORY_INDEX_FILE
   const candidate = String(rawPath || '').trim()
   if (!candidate) return null
 
-  // Special handling for MEMORY.md - it's in workspace root, not in memory subdir
-  if (candidate === 'MEMORY.md' && fs.existsSync(MEMORY_INDEX_FILE)) {
-    return MEMORY_INDEX_FILE
+  if (candidate === 'MEMORY.md' && fs.existsSync(indexFile)) {
+    return indexFile
   }
 
   const absolute = path.isAbsolute(candidate)
     ? path.resolve(candidate)
-    : path.resolve(MEMORY_DIR, candidate)
+    : path.resolve(memoryDir, candidate)
 
-  const inMemoryDir = absolute === MEMORY_DIR || absolute.startsWith(`${MEMORY_DIR}${path.sep}`)
-  const isIndexFile = absolute === MEMORY_INDEX_FILE
+  const inMemoryDir = absolute === memoryDir || absolute.startsWith(`${memoryDir}${path.sep}`)
+  const isIndexFile = absolute === indexFile
 
   if (!inMemoryDir && !isIndexFile) return null
   return absolute
 }
 
-function readMemoryFilePreview(filePath, maxChars) {
+function readMemoryFilePreview(filePath, maxChars, options = {}) {
   const stat = fs.statSync(filePath)
   if (!stat.isFile()) {
     throw new Error('目标不是文件')
@@ -401,46 +557,7 @@ function readMemoryFilePreview(filePath, maxChars) {
     throw new Error('仅支持 .md 文件')
   }
 
-  const fullText = fs.readFileSync(filePath, 'utf-8')
-  const preview = fullText.length > maxChars ? fullText.slice(0, maxChars) : fullText
-  const lines = fullText.split('\n')
-
-  const headings = []
-  for (const line of lines) {
-    const match = line.match(/^(#{1,6})\s+(.+)$/)
-    if (!match) continue
-    headings.push({ level: match[1].length, text: match[2].trim() })
-    if (headings.length >= 24) break
-  }
-
-  const tagSet = new Set()
-  for (const line of lines) {
-    if (!line.includes('#')) continue
-    const matches = line.match(/#[\p{L}\p{N}_-]+/gu) || []
-    for (const tag of matches) {
-      if (tag.length <= 1) continue
-      tagSet.add(tag.slice(1))
-      if (tagSet.size >= 24) break
-    }
-    if (tagSet.size >= 24) break
-  }
-
-  const relativePath = filePath === MEMORY_INDEX_FILE
-    ? 'MEMORY.md'
-    : path.relative(MEMORY_DIR, filePath)
-
-  return {
-    path: filePath,
-    relativePath,
-    name: path.basename(filePath),
-    sizeBytes: stat.size,
-    modifiedAt: stat.mtimeMs,
-    lineCount: lines.length,
-    truncated: fullText.length > preview.length,
-    preview,
-    headings,
-    tags: [...tagSet],
-  }
+  return readTextFilePreview(filePath, maxChars, options)
 }
 
 // ── Session BFF Helpers ───────────────────────────────────────────────────────
@@ -985,7 +1102,7 @@ async function loadSessionDetail(sessionKey, opts) {
 
 function setCors(res) {
   res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS')
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
 }
 
@@ -1037,62 +1154,73 @@ const server = http.createServer(async (req, res) => {
     return
   }
 
-  // POST /api/tasks - Create new task
+  // POST /api/tasks
   if (req.method === 'POST' && pathname === '/api/tasks') {
     try {
-      let body = ''
-      for await (const chunk of req) {
-        body += chunk
-      }
-      const { title, status = 'todo', checkboxes = [] } = JSON.parse(body)
+      let rawBody = ''
+      for await (const chunk of req) rawBody += chunk
 
-      if (!title || !title.trim()) {
+      let body = {}
+      try {
+        body = rawBody ? JSON.parse(rawBody) : {}
+      } catch (error) {
+        apiError(res, 400, 'INVALID_JSON', '请求体不是合法 JSON', String(error))
+        return
+      }
+
+      const title = String(body.title || '').trim()
+      if (!title) {
         apiError(res, 400, 'INVALID_TASK_TITLE', '任务标题不能为空')
         return
       }
 
-      const taskId = `TASK-${Date.now().toString(36).toUpperCase()}`
-      const timestamp = new Date().toISOString().split('T')[0]
-      
-      // Build task markdown
-      let taskMd = `\n## [${taskId}] ${title.trim()}\n\n`
-      if (checkboxes.length > 0) {
-        for (const cb of checkboxes) {
-          taskMd += `- [ ] ${cb.text || ''}\n`
-        }
-        taskMd += '\n'
-      }
-      taskMd += `> Created: ${timestamp} | Status: ${status}\n`
+      const status = normalizeTaskStatus(body.status)
+      const ownerAgent = String(body.ownerAgent || 'main').trim() || 'main'
+      const priority = ['P0', 'P1', 'P2'].includes(String(body.priority || '').trim())
+        ? String(body.priority).trim()
+        : 'P1'
+      const tags = normalizeTaskTags(body.tags)
+      const checkboxes = normalizeTaskLines(body.checkboxes).map(item => item.replace(/^[-*]\s+/, ''))
+      const inputs = normalizeTaskLines(body.inputs, ['Dashboard UI 创建'])
+      const deliverables = normalizeTaskLines(body.deliverables, ['写入 running_tasks.md 并回显到 Tasks 看板'])
+      const blockers = normalizeTaskLines(body.blockers, ['无'])
+      const due = String(body.due || '').trim()
 
-      // Append to running_tasks.md
-      const currentMd = fs.existsSync(TASKS_FILE) ? fs.readFileSync(TASKS_FILE, 'utf-8') : ''
-      const updatedMd = currentMd.trim() + taskMd
-      fs.writeFileSync(TASKS_FILE, updatedMd + '\n', 'utf-8')
+      const currentMd = fs.existsSync(TASKS_FILE)
+        ? fs.readFileSync(TASKS_FILE, 'utf-8')
+        : '# Running Tasks\n\n'
+      const { dateKey, dateTimeLabel } = getShanghaiDateParts(new Date())
+      const taskId = generateTaskId(currentMd, dateKey)
+      const taskMd = buildTaskMarkdownEntry({
+        taskId,
+        title,
+        status,
+        ownerAgent,
+        priority,
+        tags,
+        due,
+        inputs,
+        deliverables,
+        blockers,
+        checkboxes,
+        lastUpdate: dateTimeLabel,
+      })
+
+      const baseMd = replaceNoActiveTaskHint(currentMd).trimEnd()
+      const updatedMd = `${baseMd}${baseMd ? '\n\n' : ''}${taskMd}\n`
+      fs.writeFileSync(TASKS_FILE, updatedMd, 'utf-8')
 
       json(res, 201, {
         ok: true,
         ts: Date.now(),
-        taskId,
-        message: 'Task created successfully',
+        data: {
+          taskId,
+          taskFile: TASKS_FILE,
+          task: parseTasksMd(taskMd)[0],
+        },
       })
     } catch (err) {
       apiError(res, 500, 'TASK_CREATE_FAILED', '创建任务失败', String(err))
-    }
-    return
-  }
-
-  // GET /api/agents - List available agents
-  if (req.method === 'GET' && pathname === '/api/agents') {
-    try {
-      const agents = getAgentsList()
-      json(res, 200, {
-        ok: true,
-        ts: Date.now(),
-        agents,
-        count: agents.length,
-      })
-    } catch (err) {
-      apiError(res, 500, 'AGENTS_LIST_FAILED', '获取 Agent 列表失败', String(err))
     }
     return
   }
@@ -1135,25 +1263,35 @@ const server = http.createServer(async (req, res) => {
 
   // ── Memory v1 endpoints ───────────────────────────────────────────────────
 
+  // GET /api/v1/memory/agents
+  if (req.method === 'GET' && pathname === '/api/v1/memory/agents') {
+    const agents = listMemoryAgentSources()
+    json(res, 200, {
+      ok: true,
+      ts: Date.now(),
+      data: {
+        agents,
+        defaultAgentId: 'main',
+      },
+    })
+    return
+  }
+
   // GET /api/v1/memory/tree?agentId=<agent>
   if (req.method === 'GET' && pathname === '/api/v1/memory/tree') {
-    const agentId = url.searchParams.get('agentId') || ''
-    const memoryDir = getMemoryDirForAgent(agentId)
-    const result = scanMemoryDirV1(memoryDir)
-    const warnings = [...result.warnings]
-    if (agentId && memoryDir === MEMORY_DIR) {
-      warnings.push(`Agent "${agentId}" memory not found, falling back to default workspace`)
-    }
+    const source = buildMemoryAgentSource(url.searchParams.get('agentId') || 'main')
+    const result = scanMemoryDirV1(source.memoryDir, source.indexFile)
+    const warnings = [...new Set([...(source.warnings || []), ...(result.warnings || [])])]
+
     json(res, result.error ? 500 : 200, {
       ok: !result.error,
       ts: Date.now(),
-      source: memoryDir,
-      agentId: agentId || null,
       data: {
         tree: result.tree,
         totalFiles: result.flatFiles.length,
-        partial: result.partial,
+        partial: Boolean(result.partial || warnings.length > 0),
         warnings,
+        source,
       },
     })
     return
@@ -1163,9 +1301,8 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'GET' && pathname === '/api/v1/memory/list') {
     const sort = url.searchParams.get('sort') || 'modified'
     const categoryFilter = url.searchParams.get('category') || ''
-    const agentId = url.searchParams.get('agentId') || ''
-    const memoryDir = getMemoryDirForAgent(agentId)
-    const result = scanMemoryDirV1(memoryDir)
+    const source = buildMemoryAgentSource(url.searchParams.get('agentId') || 'main')
+    const result = scanMemoryDirV1(source.memoryDir, source.indexFile)
 
     let files = result.flatFiles
     if (categoryFilter) {
@@ -1177,38 +1314,41 @@ const server = http.createServer(async (req, res) => {
       files = [...files].sort((a, b) => (b.modifiedAt || 0) - (a.modifiedAt || 0))
     }
 
-    const warnings = [...result.warnings]
-    if (agentId && memoryDir === MEMORY_DIR) {
-      warnings.push(`Agent "${agentId}" memory not found, falling back to default workspace`)
-    }
+    const warnings = [...new Set([...(source.warnings || []), ...(result.warnings || [])])]
 
     json(res, result.error ? 500 : 200, {
       ok: !result.error,
       ts: Date.now(),
-      source: memoryDir,
-      agentId: agentId || null,
       data: {
         files,
         total: files.length,
-        partial: result.partial,
+        partial: Boolean(result.partial || warnings.length > 0),
         warnings,
+        source,
       },
     })
     return
   }
 
-  // GET /api/v1/memory/preview?path=...&maxChars=12000
+  // GET /api/v1/memory/preview?path=...&agentId=<agent>&maxChars=12000
   if (req.method === 'GET' && pathname === '/api/v1/memory/preview') {
+    const source = buildMemoryAgentSource(url.searchParams.get('agentId') || 'main')
     const rawPath = url.searchParams.get('path') || ''
-    const filePath = resolveMemoryFilePath(rawPath)
+    const filePath = resolveMemoryFilePath(rawPath, {
+      memoryDir: source.memoryDir,
+      indexFile: source.indexFile,
+    })
     if (!filePath) {
       apiError(res, 400, 'INVALID_MEMORY_PATH', 'Path not allowed or missing')
       return
     }
     const maxChars = parseIntWithBounds(url.searchParams.get('maxChars'), 12_000, 500, 60_000)
     try {
-      const data = readTextFilePreview(filePath, maxChars)
-      json(res, 200, { ok: true, ts: Date.now(), data })
+      const data = readTextFilePreview(filePath, maxChars, {
+        memoryDir: source.memoryDir,
+        indexFile: source.indexFile,
+      })
+      json(res, 200, { ok: true, ts: Date.now(), data, source })
     } catch (err) {
       const code = String(err?.message || err).startsWith('Not previewable')
         ? 'NOT_PREVIEWABLE'
@@ -1218,18 +1358,25 @@ const server = http.createServer(async (req, res) => {
     return
   }
 
-  // GET /api/v1/memory/detail?path=...&maxChars=60000
+  // GET /api/v1/memory/detail?path=...&agentId=<agent>&maxChars=60000
   if (req.method === 'GET' && pathname === '/api/v1/memory/detail') {
+    const source = buildMemoryAgentSource(url.searchParams.get('agentId') || 'main')
     const rawPath = url.searchParams.get('path') || ''
-    const filePath = resolveMemoryFilePath(rawPath)
+    const filePath = resolveMemoryFilePath(rawPath, {
+      memoryDir: source.memoryDir,
+      indexFile: source.indexFile,
+    })
     if (!filePath) {
       apiError(res, 400, 'INVALID_MEMORY_PATH', 'Path not allowed or missing')
       return
     }
     const maxChars = parseIntWithBounds(url.searchParams.get('maxChars'), 60_000, 500, 200_000)
     try {
-      const data = readTextFilePreview(filePath, maxChars)
-      json(res, 200, { ok: true, ts: Date.now(), data })
+      const data = readTextFilePreview(filePath, maxChars, {
+        memoryDir: source.memoryDir,
+        indexFile: source.indexFile,
+      })
+      json(res, 200, { ok: true, ts: Date.now(), data, source })
     } catch (err) {
       const code = String(err?.message || err).startsWith('Not previewable')
         ? 'NOT_PREVIEWABLE'
@@ -1421,17 +1568,17 @@ const server = http.createServer(async (req, res) => {
 server.listen(PORT, '127.0.0.1', () => {
   console.log(`✅ BFF running at http://127.0.0.1:${PORT}`)
   console.log(`   GET  /api/tasks`)
-  console.log(`   POST /api/tasks   (create task)`)
-  console.log(`   GET  /api/agents (list agents)`)
-  console.log(`   GET /api/memory                              (legacy)`)
-  console.log(`   GET /api/memory/file?path=<p>&maxChars=<n>  (legacy)`)
-  console.log(`   GET /api/v1/memory/tree?agentId=<agent>`)
-  console.log(`   GET /api/v1/memory/list?sort=...&category=<cat>&agentId=<agent>`)
-  console.log(`   GET /api/v1/memory/preview?path=<p>&maxChars=<n>`)
-  console.log(`   GET /api/v1/memory/detail?path=<p>&maxChars=<n>`)
-  console.log(`   GET /api/runs`)
-  console.log(`   GET /api/sessions`)
-  console.log(`   GET /api/sessions/:sessionKey/detail`)
-  console.log(`   GET /api/sessions/:sessionKey/relations`)
-  console.log(`   GET /api/sessions/:sessionKey/events`)
+  console.log(`   POST /api/tasks`)
+  console.log(`   GET  /api/memory                              (legacy)`)
+  console.log(`   GET  /api/memory/file?path=<p>&maxChars=<n>  (legacy)`)
+  console.log(`   GET  /api/v1/memory/agents`)
+  console.log(`   GET  /api/v1/memory/tree?agentId=<agent>`)
+  console.log(`   GET  /api/v1/memory/list?sort=...&category=<cat>&agentId=<agent>`)
+  console.log(`   GET  /api/v1/memory/preview?path=<p>&agentId=<agent>&maxChars=<n>`)
+  console.log(`   GET  /api/v1/memory/detail?path=<p>&agentId=<agent>&maxChars=<n>`)
+  console.log(`   GET  /api/runs`)
+  console.log(`   GET  /api/sessions`)
+  console.log(`   GET  /api/sessions/:sessionKey/detail`)
+  console.log(`   GET  /api/sessions/:sessionKey/relations`)
+  console.log(`   GET  /api/sessions/:sessionKey/events`)
 })

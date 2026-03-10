@@ -1,107 +1,49 @@
-import { useState } from 'react'
-import { useAgentsList, AgentsListResponse } from '../../hooks/useMemory'
+import { V1MemoryAgentSource } from '../../hooks/useMemory'
 
 interface AgentSelectorProps {
-  selectedAgentId: string | null
-  onAgentChange: (agentId: string | null) => void
+  agents: V1MemoryAgentSource[]
+  selectedAgentId: string
+  onAgentChange: (agentId: string) => void
+  loading?: boolean
 }
 
-export function AgentSelector({ selectedAgentId, onAgentChange }: AgentSelectorProps) {
-  const { data, isLoading, error } = useAgentsList()
-  const [isOpen, setIsOpen] = useState(false)
+function buildStatusText(agent: V1MemoryAgentSource) {
+  const parts: string[] = []
+  if (agent.memoryDirExists) parts.push('memory')
+  if (agent.indexFileExists) parts.push('index')
+  if (agent.sqliteExists) parts.push('sqlite')
+  return parts.length > 0 ? parts.join(' · ') : '未发现 memory 数据'
+}
 
-  const agents = data?.agents || []
-  const displayLabel = selectedAgentId 
-    ? `Agent: ${selectedAgentId}` 
-    : 'Default Workspace'
-
-  const handleSelect = (agentId: string | null) => {
-    onAgentChange(agentId)
-    setIsOpen(false)
-  }
+export function AgentSelector({ agents, selectedAgentId, onAgentChange, loading }: AgentSelectorProps) {
+  const selected = agents.find(agent => agent.agentId === selectedAgentId) || agents[0]
 
   return (
-    <div className="relative">
-      <button
-        type="button"
-        onClick={() => setIsOpen(!isOpen)}
-        disabled={isLoading}
-        className={`
-          flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm border transition-colors
-          ${selectedAgentId 
-            ? 'bg-indigo-600/20 border-indigo-500 text-indigo-300 hover:bg-indigo-600/30' 
-            : 'bg-gray-800 border-gray-600 text-gray-300 hover:bg-gray-700'
-          }
-          ${isLoading ? 'opacity-50 cursor-wait' : ''}
-        `}
+    <div className="flex flex-col gap-2 rounded-lg border border-gray-800 bg-gray-900/70 px-3 py-2 min-w-[260px]">
+      <label className="text-[11px] uppercase tracking-wide text-gray-500">Memory Source</label>
+      <select
+        value={selectedAgentId}
+        onChange={e => onAgentChange(e.target.value)}
+        disabled={loading || agents.length === 0}
+        className="rounded-md border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-gray-200 focus:border-indigo-500 focus:outline-none"
       >
-        <span className="text-base">🤖</span>
-        <span className="max-w-[120px] truncate">{displayLabel}</span>
-        <svg 
-          className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} 
-          fill="none" viewBox="0 0 24 24" stroke="currentColor"
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-        </svg>
-      </button>
+        {agents.map(agent => (
+          <option key={agent.agentId} value={agent.agentId}>
+            {agent.label} ({agent.agentId})
+          </option>
+        ))}
+      </select>
 
-      {isOpen && (
-        <div className="absolute top-full left-0 mt-1 w-56 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-50">
-          <div className="p-2">
-            <button
-              type="button"
-              onClick={() => handleSelect(null)}
-              className={`
-                w-full text-left px-3 py-2 rounded text-sm transition-colors
-                ${!selectedAgentId ? 'bg-indigo-600 text-white' : 'text-gray-300 hover:bg-gray-700'}
-              `}
-            >
-              🏠 Default Workspace
-            </button>
-            
-            {agents.length > 0 && (
-              <div className="mt-2 pt-2 border-t border-gray-700">
-                <p className="px-3 py-1 text-xs text-gray-500">Available Agents</p>
-                {agents.map(agent => (
-                  <button
-                    key={agent}
-                    type="button"
-                    onClick={() => handleSelect(agent)}
-                    className={`
-                      w-full text-left px-3 py-2 rounded text-sm transition-colors
-                      ${selectedAgentId === agent 
-                        ? 'bg-indigo-600 text-white' 
-                        : 'text-gray-300 hover:bg-gray-700'
-                      }
-                    `}
-                  >
-                    🤖 {agent}
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {agents.length === 0 && !isLoading && (
-              <p className="px-3 py-2 text-xs text-gray-500">
-                No agent directories found
-              </p>
-            )}
-
-            {error && (
-              <p className="px-3 py-2 text-xs text-red-400">
-                Failed to load agents
-              </p>
-            )}
+      {selected && (
+        <div className="space-y-1 text-[11px] text-gray-500">
+          <p className="truncate">{selected.workspaceDir}</p>
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className={`rounded px-1.5 py-0.5 ${selected.available ? 'bg-emerald-900/30 text-emerald-300' : 'bg-yellow-900/30 text-yellow-200'}`}>
+              {selected.available ? 'ready' : 'degraded'}
+            </span>
+            <span>{buildStatusText(selected)}</span>
           </div>
         </div>
-      )}
-
-      {/* Backdrop to close dropdown */}
-      {isOpen && (
-        <div 
-          className="fixed inset-0 z-40" 
-          onClick={() => setIsOpen(false)}
-        />
       )}
     </div>
   )

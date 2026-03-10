@@ -170,7 +170,7 @@ export function useMemoryFilePreview(filePath: string | null) {
   })
 }
 
-// ── v1 hooks (Sprint2) ────────────────────────────────────────────────────────
+// ── v1 hooks (Sprint2/4) ─────────────────────────────────────────────────────
 
 export type V1MemoryCategory = 'index' | 'daily' | 'archive' | 'catalog' | 'note'
 
@@ -198,11 +198,70 @@ export interface V1MemoryDirNode {
 
 export type V1MemoryTreeNode = V1MemoryFileNode | V1MemoryDirNode
 
+export interface V1MemoryAgentSource {
+  agentId: string
+  label: string
+  workspaceDir: string
+  memoryDir: string
+  indexFile: string
+  sqliteFile: string
+  workspaceExists: boolean
+  memoryDirExists: boolean
+  indexFileExists: boolean
+  sqliteExists: boolean
+  available: boolean
+  warnings: string[]
+}
+
+interface V1MemorySourceResponse {
+  ok: boolean
+  ts: number
+  data?: {
+    agents: V1MemoryAgentSource[]
+    defaultAgentId: string
+  }
+  error?: { code?: string; message?: string }
+}
+
+interface V1MemoryListResponse {
+  ok: boolean
+  ts: number
+  data?: {
+    files: V1MemoryFileNode[]
+    total: number
+    partial: boolean
+    warnings: string[]
+    source: V1MemoryAgentSource
+  }
+  error?: { code?: string; message?: string }
+}
+
+interface V1MemoryTreeResponse {
+  ok: boolean
+  ts: number
+  data?: {
+    tree: V1MemoryTreeNode[]
+    totalFiles: number
+    partial: boolean
+    warnings: string[]
+    source: V1MemoryAgentSource
+  }
+  error?: { code?: string; message?: string }
+}
+
+interface V1MemoryPreviewResponse {
+  ok: boolean
+  ts: number
+  data?: V1MemoryFileDetail
+  error?: { code?: string; message?: string }
+}
+
 export interface V1MemoryTreeData {
   tree: V1MemoryTreeNode[]
   totalFiles: number
   partial: boolean
   warnings: string[]
+  source: V1MemoryAgentSource
 }
 
 export interface V1MemoryListData {
@@ -210,8 +269,7 @@ export interface V1MemoryListData {
   total: number
   partial: boolean
   warnings: string[]
-  source?: string  // Added for agent-aware memory
-  agentId?: string | null  // Added for agent-aware memory
+  source: V1MemoryAgentSource
 }
 
 export interface V1MemoryHeading {
@@ -233,124 +291,106 @@ export interface V1MemoryFileDetail {
   tags?: string[]
 }
 
-export function useMemoryTree() {
-  return useQuery<V1MemoryTreeData>({
-    queryKey: ['memory-v1-tree'],
-    queryFn: async (): Promise<V1MemoryTreeData> => {
-      const resp = await fetch(`${BFF_BASE}/api/v1/memory/tree`)
-      if (!resp.ok) throw new Error(`BFF /api/v1/memory/tree HTTP ${resp.status}`)
-      const json = await resp.json()
-      if (!json.ok) throw new Error(json.error?.message || 'memory tree error')
-      return json.data as V1MemoryTreeData
-    },
-    refetchInterval: 30_000,
-    refetchIntervalInBackground: false,
-    staleTime: 20_000,
-    retry: 1,
-  })
+export interface MemoryAgentsData {
+  agents: V1MemoryAgentSource[]
+  defaultAgentId: string
 }
 
-export function useMemoryTreeWithAgent(agentId: string | null) {
-  return useQuery<V1MemoryTreeData>({
-    queryKey: ['memory-v1-tree', agentId],
-    queryFn: async (): Promise<V1MemoryTreeData> => {
-      const params = new URLSearchParams()
-      if (agentId) params.set('agentId', agentId)
-      const url = `${BFF_BASE}/api/v1/memory/tree?${params}`
-      const resp = await fetch(url)
-      if (!resp.ok) throw new Error(`BFF /api/v1/memory/tree HTTP ${resp.status}`)
-      const json = await resp.json()
-      if (!json.ok) throw new Error(json.error?.message || 'memory tree error')
-      return json.data as V1MemoryTreeData
-    },
-    enabled: true,
-    refetchInterval: 30_000,
-    refetchIntervalInBackground: false,
-    staleTime: 20_000,
-    retry: 1,
-  })
-}
-
-export function useMemoryList(sort: 'modified' | 'name' = 'modified', category?: V1MemoryCategory, agentId?: string | null) {
-  return useQuery<V1MemoryListData>({
-    queryKey: ['memory-v1-list', sort, category ?? '', agentId ?? ''],
-    queryFn: async (): Promise<V1MemoryListData> => {
-      const params = new URLSearchParams({ sort })
-      if (category) params.set('category', category)
-      if (agentId) params.set('agentId', agentId)
-      const resp = await fetch(`${BFF_BASE}/api/v1/memory/list?${params}`)
-      if (!resp.ok) throw new Error(`BFF /api/v1/memory/list HTTP ${resp.status}`)
-      const json = await resp.json()
-      if (!json.ok) throw new Error(json.error?.message || 'memory list error')
-      return json.data as V1MemoryListData
-    },
-    refetchInterval: 30_000,
-    refetchIntervalInBackground: false,
-    staleTime: 20_000,
-    retry: 1,
-  })
-}
-
-// ── Agents list hook ─────────────────────────────────────────────────────────
-
-export interface AgentsListResponse {
-  ok: boolean
-  ts: number
-  agents: string[]
-  count: number
-}
-
-export function useAgentsList() {
-  return useQuery<AgentsListResponse>({
-    queryKey: ['agents-list'],
-    queryFn: async (): Promise<AgentsListResponse> => {
-      const resp = await fetch(`${BFF_BASE}/api/agents`)
-      if (!resp.ok) throw new Error(`BFF /api/agents HTTP ${resp.status}`)
-      const json = await resp.json()
-      if (!json.ok) throw new Error(json.error?.message || 'agents list error')
-      return json as AgentsListResponse
+export function useMemoryAgents() {
+  return useQuery<MemoryAgentsData>({
+    queryKey: ['memory-v1-agents'],
+    queryFn: async (): Promise<MemoryAgentsData> => {
+      const resp = await fetch(`${BFF_BASE}/api/v1/memory/agents`)
+      const json = (await resp.json()) as V1MemorySourceResponse
+      if (!resp.ok || !json.ok || !json.data) {
+        throw new Error(json.error?.message || `BFF /api/v1/memory/agents HTTP ${resp.status}`)
+      }
+      return json.data
     },
     refetchInterval: 60_000,
     refetchIntervalInBackground: false,
-    staleTime: 50_000,
+    staleTime: 45_000,
     retry: 1,
   })
 }
 
-export function useMemoryPreview(filePath: string | null, maxChars = 12_000) {
+export function useMemoryTree(agentId = 'main') {
+  return useQuery<V1MemoryTreeData>({
+    queryKey: ['memory-v1-tree', agentId],
+    queryFn: async (): Promise<V1MemoryTreeData> => {
+      const params = new URLSearchParams({ agentId })
+      const resp = await fetch(`${BFF_BASE}/api/v1/memory/tree?${params}`)
+      const json = (await resp.json()) as V1MemoryTreeResponse
+      if (!resp.ok || !json.ok || !json.data) {
+        throw new Error(json.error?.message || `BFF /api/v1/memory/tree HTTP ${resp.status}`)
+      }
+      return json.data
+    },
+    refetchInterval: 30_000,
+    refetchIntervalInBackground: false,
+    staleTime: 20_000,
+    retry: 1,
+  })
+}
+
+export function useMemoryList(
+  sort: 'modified' | 'name' = 'modified',
+  category?: V1MemoryCategory,
+  agentId = 'main'
+) {
+  return useQuery<V1MemoryListData>({
+    queryKey: ['memory-v1-list', sort, category ?? '', agentId],
+    queryFn: async (): Promise<V1MemoryListData> => {
+      const params = new URLSearchParams({ sort, agentId })
+      if (category) params.set('category', category)
+      const resp = await fetch(`${BFF_BASE}/api/v1/memory/list?${params}`)
+      const json = (await resp.json()) as V1MemoryListResponse
+      if (!resp.ok || !json.ok || !json.data) {
+        throw new Error(json.error?.message || `BFF /api/v1/memory/list HTTP ${resp.status}`)
+      }
+      return json.data
+    },
+    refetchInterval: 30_000,
+    refetchIntervalInBackground: false,
+    staleTime: 20_000,
+    retry: 1,
+  })
+}
+
+export function useMemoryPreview(filePath: string | null, agentId = 'main', maxChars = 12_000) {
   return useQuery<V1MemoryFileDetail>({
-    queryKey: ['memory-v1-preview', filePath, maxChars],
+    queryKey: ['memory-v1-preview', agentId, filePath, maxChars],
     enabled: !!filePath,
     queryFn: async (): Promise<V1MemoryFileDetail> => {
-      const params = new URLSearchParams({ path: filePath!, maxChars: String(maxChars) })
+      const params = new URLSearchParams({ path: filePath!, agentId, maxChars: String(maxChars) })
       const resp = await fetch(`${BFF_BASE}/api/v1/memory/preview?${params}`)
       if (!resp.ok) {
         const body = await resp.json().catch(() => ({}))
         throw new Error(body?.error?.message || `HTTP ${resp.status}`)
       }
-      const json = await resp.json()
-      if (!json.ok) throw new Error(json.error?.message || 'preview error')
-      return json.data as V1MemoryFileDetail
+      const json = (await resp.json()) as V1MemoryPreviewResponse
+      if (!json.ok || !json.data) throw new Error(json.error?.message || 'preview error')
+      return json.data
     },
     staleTime: 15_000,
     retry: 1,
   })
 }
 
-export function useMemoryDetail(filePath: string | null, maxChars = 60_000) {
+export function useMemoryDetail(filePath: string | null, agentId = 'main', maxChars = 60_000) {
   return useQuery<V1MemoryFileDetail>({
-    queryKey: ['memory-v1-detail', filePath, maxChars],
+    queryKey: ['memory-v1-detail', agentId, filePath, maxChars],
     enabled: !!filePath,
     queryFn: async (): Promise<V1MemoryFileDetail> => {
-      const params = new URLSearchParams({ path: filePath!, maxChars: String(maxChars) })
+      const params = new URLSearchParams({ path: filePath!, agentId, maxChars: String(maxChars) })
       const resp = await fetch(`${BFF_BASE}/api/v1/memory/detail?${params}`)
       if (!resp.ok) {
         const body = await resp.json().catch(() => ({}))
         throw new Error(body?.error?.message || `HTTP ${resp.status}`)
       }
-      const json = await resp.json()
-      if (!json.ok) throw new Error(json.error?.message || 'detail error')
-      return json.data as V1MemoryFileDetail
+      const json = (await resp.json()) as V1MemoryPreviewResponse
+      if (!json.ok || !json.data) throw new Error(json.error?.message || 'detail error')
+      return json.data
     },
     staleTime: 15_000,
     retry: 1,

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { V1MemoryCategory, V1MemoryFileNode, useMemoryList, useMemoryPreview, useAgentsList } from '../hooks/useMemory'
+import { V1MemoryCategory, V1MemoryFileNode, useMemoryAgents, useMemoryList, useMemoryPreview } from '../hooks/useMemory'
 import { LoadingSpinner } from '../components/shared/LoadingSpinner'
 import { EmptyState } from '../components/shared/EmptyState'
 import { MemoryStateBanner } from '../components/memory/MemoryStateBanner'
@@ -17,20 +17,28 @@ function formatRefreshTime(ts?: number) {
 }
 
 export function MemoryPage() {
+  const [selectedAgentId, setSelectedAgentId] = useState('main')
   const [searchText, setSearchText] = useState('')
   const [category, setCategory] = useState<V1MemoryCategory | 'all'>('all')
   const [selectedPath, setSelectedPath] = useState<string | null>(null)
-  const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null)
 
-  // Fetch agents list (for selector)
-  const agentsQuery = useAgentsList()
+  const agentsQuery = useMemoryAgents()
 
-  // Fetch memory list with agent selection
-  const memoryQuery = useMemoryList('modified', category === 'all' ? undefined : category, selectedAgentId)
+  useEffect(() => {
+    const defaultAgentId = agentsQuery.data?.defaultAgentId || 'main'
+    const availableAgents = agentsQuery.data?.agents || []
+    if (!availableAgents.some(agent => agent.agentId === selectedAgentId)) {
+      setSelectedAgentId(defaultAgentId)
+    }
+  }, [agentsQuery.data, selectedAgentId])
+
+  const selectedAgent = useMemo(
+    () => agentsQuery.data?.agents.find(agent => agent.agentId === selectedAgentId) || agentsQuery.data?.agents[0],
+    [agentsQuery.data, selectedAgentId]
+  )
+
+  const memoryQuery = useMemoryList('modified', undefined, selectedAgentId)
   const files = memoryQuery.data?.files || []
-
-  // Show agent-specific warning if applicable
-  const agentWarning = memoryQuery.data?.warnings?.[0]
 
   const filteredFiles = useMemo(() => {
     const q = searchText.trim().toLowerCase()
@@ -64,20 +72,24 @@ export function MemoryPage() {
     [files, selectedPath]
   )
 
-  // Only request preview for previewable files
   const previewPath = selectedFile?.previewable ? selectedPath : null
-  const previewQuery = useMemoryPreview(previewPath)
+  const previewQuery = useMemoryPreview(previewPath, selectedAgentId)
 
-  const loadingCore = memoryQuery.isLoading && files.length === 0
+  const loadingCore = (agentsQuery.isLoading && !agentsQuery.data) || (memoryQuery.isLoading && files.length === 0)
   const noData = !loadingCore && files.length === 0
+  const agentsError = agentsQuery.error ? String(agentsQuery.error) : ''
   const indexError = memoryQuery.error ? String(memoryQuery.error) : ''
-  const isPartial = Boolean(memoryQuery.data?.partial)
+  const warnings = [
+    ...(selectedAgent?.warnings || []),
+    ...(memoryQuery.data?.warnings || []),
+  ]
+  const isPartial = Boolean(warnings.length > 0 || memoryQuery.data?.partial)
   const isStale = memoryQuery.isStale
 
   const refreshAll = () => {
+    void agentsQuery.refetch()
     void memoryQuery.refetch()
     void previewQuery.refetch()
-    void agentsQuery.refetch()
   }
 
   if (loadingCore) {
@@ -86,23 +98,21 @@ export function MemoryPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div className="flex items-center gap-4">
-          <div>
-            <h1 className="text-xl font-bold text-white">Memory</h1>
-            <p className="text-sm text-gray-500 mt-1">
-              记忆文件索引 + 预览区 · {files.length} 个文件 · 上次刷新 {formatRefreshTime(memoryQuery.dataUpdatedAt ?? undefined)}
-            </p>
-          </div>
-          
-          {/* Agent Selector */}
-          <AgentSelector
-            selectedAgentId={selectedAgentId}
-            onAgentChange={setSelectedAgentId}
-          />
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-xl font-bold text-white">Memory</h1>
+          <p className="text-sm text-gray-500 mt-1">
+            多 Agent 记忆索引 + 预览区 · 当前 {selectedAgent?.label || selectedAgentId} · {files.length} 个文件 · 上次刷新 {formatRefreshTime(memoryQuery.dataUpdatedAt ?? undefined)}
+          </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-start gap-3 flex-wrap">
+          <AgentSelector
+            agents={agentsQuery.data?.agents || []}
+            selectedAgentId={selectedAgentId}
+            onAgentChange={setSelectedAgentId}
+            loading={agentsQuery.isLoading}
+          />
           <button
             type="button"
             onClick={refreshAll}
@@ -113,14 +123,21 @@ export function MemoryPage() {
         </div>
       </div>
 
-      {/* Agent context banner */}
-      {selectedAgentId && !indexError && (
-        <div className="bg-indigo-900/20 border border-indigo-800 rounded-lg px-3 py-2 text-sm text-indigo-300">
-          当前查看 Agent <span className="font-medium">{selectedAgentId}</span> 的 Memory
-          {memoryQuery.data?.source && (
-            <span className="text-gray-500 ml-2">({memoryQuery.data.source})</span>
+      {agentsError && (
+        <MemoryStateBanner
+          type="error"
+          title="Memory Agent 列表加载失败"
+          description={agentsError}
+          action={(
+            <button
+              type="button"
+              onClick={refreshAll}
+              className="rounded border border-red-800 px-2 py-1 text-xs text-red-200 hover:bg-red-900/30"
+            >
+              重试
+            </button>
           )}
-        </div>
+        />
       )}
 
       {indexError && (
@@ -157,20 +174,11 @@ export function MemoryPage() {
         />
       )}
 
-      {/* Agent fallback warning */}
-      {!indexError && agentWarning && (
-        <MemoryStateBanner
-          type="partial"
-          title="Agent Memory 降级"
-          description={agentWarning}
-        />
-      )}
-
       {!indexError && isPartial && (
         <MemoryStateBanner
           type="partial"
-          title="部分目录暂不可用"
-          description={memoryQuery.data?.warnings?.[0] || '至少有一个目录读取失败，当前先展示可访问部分。'}
+          title="当前 Agent 的 Memory 来源存在降级信息"
+          description={warnings[0] || '至少有一个目录/索引/sqlite 缺失，当前先展示可访问部分。'}
         />
       )}
 
@@ -184,13 +192,10 @@ export function MemoryPage() {
 
       {noData ? (
         <div className="bg-gray-900 border border-gray-800 rounded-xl">
-          <EmptyState 
-            icon="🗂️" 
-            title={selectedAgentId ? `Agent "${selectedAgentId}" Memory 目录为空` : "Memory 目录为空"} 
-            description={selectedAgentId 
-              ? "该 Agent 没有 Memory 文件或目录权限不足" 
-              : "当前没有可展示的 .md 文件，或目录权限不足。"
-            } 
+          <EmptyState
+            icon="🗂️"
+            title="当前 Agent 暂无 Memory 文件"
+            description={`agent=${selectedAgentId}，当前没有可展示文件，或对应 workspace/memory 目录不可访问。`}
           />
         </div>
       ) : (

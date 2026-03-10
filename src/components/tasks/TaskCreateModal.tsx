@@ -1,4 +1,6 @@
-import { useState } from 'react'
+import { type FormEvent, useMemo, useState } from 'react'
+
+const BFF_BASE = 'http://127.0.0.1:18902'
 
 interface TaskCreateModalProps {
   isOpen: boolean
@@ -6,194 +8,213 @@ interface TaskCreateModalProps {
   onSuccess: () => void
 }
 
-type TaskStatus = 'todo' | 'in_progress' | 'done' | 'blocked'
+type TaskStatus = 'todo' | 'in_progress' | 'blocked' | 'done'
+type TaskPriority = 'P0' | 'P1' | 'P2'
 
-interface CheckboxItem {
-  text: string
-}
+const ownerOptions = ['main', 'architect', 'research', 'designer']
 
 export function TaskCreateModal({ isOpen, onClose, onSuccess }: TaskCreateModalProps) {
   const [title, setTitle] = useState('')
   const [status, setStatus] = useState<TaskStatus>('todo')
-  const [checkboxes, setCheckboxes] = useState<CheckboxItem[]>([])
-  const [newCheckbox, setNewCheckbox] = useState('')
+  const [ownerAgent, setOwnerAgent] = useState('main')
+  const [priority, setPriority] = useState<TaskPriority>('P1')
+  const [tagsText, setTagsText] = useState('#agent-dashboard #tasks')
+  const [checklistText, setChecklistText] = useState('')
+  const [due, setDue] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const checklist = useMemo(
+    () => checklistText.split('\n').map(item => item.trim()).filter(Boolean),
+    [checklistText]
+  )
+
+  const reset = () => {
+    setTitle('')
+    setStatus('todo')
+    setOwnerAgent('main')
+    setPriority('P1')
+    setTagsText('#agent-dashboard #tasks')
+    setChecklistText('')
+    setDue('')
+    setError(null)
+  }
+
+  const handleClose = () => {
+    if (isSubmitting) return
+    reset()
+    onClose()
+  }
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
     if (!title.trim()) return
 
     setIsSubmitting(true)
     setError(null)
 
     try {
-      const resp = await fetch('http://127.0.0.1:18902/api/tasks', {
+      const resp = await fetch(`${BFF_BASE}/api/tasks`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title: title.trim(),
           status,
-          checkboxes: checkboxes.filter(cb => cb.text.trim()),
+          ownerAgent,
+          priority,
+          tags: tagsText,
+          due: due.trim() || undefined,
+          checkboxes: checklist,
+          inputs: ['Dashboard UI 创建'],
+          deliverables: ['写入 running_tasks.md 并回显到 Tasks 看板'],
         }),
       })
 
-      const data = await resp.json()
-
+      const data = await resp.json().catch(() => ({}))
       if (!resp.ok || !data.ok) {
-        throw new Error(data.error?.message || 'Failed to create task')
+        throw new Error(data?.error?.message || '创建任务失败')
       }
 
-      setTitle('')
-      setStatus('todo')
-      setCheckboxes([])
       onSuccess()
+      reset()
       onClose()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create task')
+    } catch (submitError) {
+      setError(submitError instanceof Error ? submitError.message : '创建任务失败')
     } finally {
       setIsSubmitting(false)
     }
   }
 
-  const addCheckbox = () => {
-    if (newCheckbox.trim()) {
-      setCheckboxes([...checkboxes, { text: newCheckbox.trim() }])
-      setNewCheckbox('')
-    }
-  }
-
-  const removeCheckbox = (index: number) => {
-    setCheckboxes(checkboxes.filter((_, i) => i !== index))
-  }
-
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      {/* Backdrop */}
-      <div 
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-        onClick={onClose}
-      />
+    <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+      <div className="absolute inset-0 bg-black/70" onClick={handleClose} />
 
-      {/* Modal */}
-      <div className="relative w-full max-w-md bg-gray-900 border border-gray-700 rounded-xl shadow-2xl p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-white">Create New Task</h2>
+      <div className="relative w-full max-w-2xl rounded-xl border border-gray-800 bg-gray-900 shadow-2xl">
+        <div className="flex items-center justify-between border-b border-gray-800 px-5 py-4">
+          <div>
+            <h2 className="text-lg font-semibold text-white">新建文档任务</h2>
+            <p className="mt-1 text-xs text-gray-500">
+              提交后会写入 <code>~/.openclaw/workspace/tasks/running_tasks.md</code>
+            </p>
+          </div>
           <button
             type="button"
-            onClick={onClose}
-            className="text-gray-400 hover:text-white transition-colors"
+            onClick={handleClose}
+            className="rounded border border-gray-700 px-2 py-1 text-xs text-gray-400 hover:bg-gray-800 hover:text-gray-200"
           >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
+            关闭
           </button>
         </div>
 
-        <form onSubmit={handleSubmit}>
-          {/* Title */}
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-300 mb-1">
-              Task Title <span className="text-red-400">*</span>
-            </label>
+        <form onSubmit={handleSubmit} className="space-y-4 px-5 py-4">
+          <div>
+            <label className="mb-1 block text-sm text-gray-300">标题</label>
             <input
-              type="text"
               value={title}
               onChange={e => setTitle(e.target.value)}
-              placeholder="Enter task title..."
-              className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              placeholder="例如：Sprint4 多 Agent memory 联调"
+              className="w-full rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-gray-100 placeholder-gray-600 focus:border-indigo-500 focus:outline-none"
               autoFocus
             />
           </div>
 
-          {/* Status */}
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-300 mb-1">
-              Status
-            </label>
-            <select
-              value={status}
-              onChange={e => setStatus(e.target.value as TaskStatus)}
-              className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            >
-              <option value="todo">待处理 (Todo)</option>
-              <option value="in_progress">进行中 (In Progress)</option>
-              <option value="done">已完成 (Done)</option>
-              <option value="blocked">阻塞 (Blocked)</option>
-            </select>
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+            <div>
+              <label className="mb-1 block text-sm text-gray-300">Owner-Agent</label>
+              <select
+                value={ownerAgent}
+                onChange={e => setOwnerAgent(e.target.value)}
+                className="w-full rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-gray-100 focus:border-indigo-500 focus:outline-none"
+              >
+                {ownerOptions.map(option => (
+                  <option key={option} value={option}>{option}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm text-gray-300">Priority</label>
+              <select
+                value={priority}
+                onChange={e => setPriority(e.target.value as TaskPriority)}
+                className="w-full rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-gray-100 focus:border-indigo-500 focus:outline-none"
+              >
+                <option value="P0">P0</option>
+                <option value="P1">P1</option>
+                <option value="P2">P2</option>
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm text-gray-300">Status</label>
+              <select
+                value={status}
+                onChange={e => setStatus(e.target.value as TaskStatus)}
+                className="w-full rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-gray-100 focus:border-indigo-500 focus:outline-none"
+              >
+                <option value="todo">todo</option>
+                <option value="in_progress">in_progress</option>
+                <option value="blocked">blocked</option>
+                <option value="done">done</option>
+              </select>
+            </div>
           </div>
 
-          {/* Checkboxes */}
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-300 mb-1">
-              Checkboxes (Optional)
-            </label>
-            <div className="flex gap-2 mb-2">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-sm text-gray-300">Tags</label>
               <input
-                type="text"
-                value={newCheckbox}
-                onChange={e => setNewCheckbox(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addCheckbox())}
-                placeholder="Add checkbox item..."
-                className="flex-1 px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                value={tagsText}
+                onChange={e => setTagsText(e.target.value)}
+                placeholder="#agent-dashboard #sprint4"
+                className="w-full rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-gray-100 placeholder-gray-600 focus:border-indigo-500 focus:outline-none"
               />
-              <button
-                type="button"
-                onClick={addCheckbox}
-                className="px-3 py-2 bg-gray-700 text-gray-300 rounded-lg hover:bg-gray-600 transition-colors"
-              >
-                Add
-              </button>
             </div>
-            {checkboxes.length > 0 && (
-              <div className="space-y-1 max-h-32 overflow-y-auto">
-                {checkboxes.map((cb, idx) => (
-                  <div key={idx} className="flex items-center gap-2 text-sm text-gray-300">
-                    <input type="checkbox" disabled className="rounded" />
-                    <span className="flex-1">{cb.text}</span>
-                    <button
-                      type="button"
-                      onClick={() => removeCheckbox(idx)}
-                      className="text-gray-500 hover:text-red-400"
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
-              </div>
+            <div>
+              <label className="mb-1 block text-sm text-gray-300">Due（可选）</label>
+              <input
+                value={due}
+                onChange={e => setDue(e.target.value)}
+                placeholder="2026-03-11 18:00"
+                className="w-full rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-gray-100 placeholder-gray-600 focus:border-indigo-500 focus:outline-none"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm text-gray-300">Checklist（每行一个，可选）</label>
+            <textarea
+              value={checklistText}
+              onChange={e => setChecklistText(e.target.value)}
+              rows={5}
+              placeholder={'补 BFF 接口\n补前端接线\n自测 build'}
+              className="w-full rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-gray-100 placeholder-gray-600 focus:border-indigo-500 focus:outline-none"
+            />
+            {checklist.length > 0 && (
+              <p className="mt-2 text-xs text-gray-500">将创建 {checklist.length} 条 checklist</p>
             )}
           </div>
 
-          {/* Error */}
           {error && (
-            <div className="mb-4 p-3 bg-red-900/30 border border-red-800 rounded-lg text-red-400 text-sm">
+            <div className="rounded-lg border border-red-800 bg-red-950/30 px-3 py-2 text-sm text-red-200">
               {error}
             </div>
           )}
 
-          {/* Actions */}
-          <div className="flex justify-end gap-3">
+          <div className="flex items-center justify-end gap-3 pt-2">
             <button
               type="button"
-              onClick={onClose}
-              className="px-4 py-2 text-gray-300 hover:text-white transition-colors"
+              onClick={handleClose}
+              className="rounded border border-gray-700 px-4 py-2 text-sm text-gray-300 hover:bg-gray-800"
             >
-              Cancel
+              取消
             </button>
             <button
               type="submit"
               disabled={!title.trim() || isSubmitting}
-              className={`
-                px-4 py-2 rounded-lg font-medium transition-colors
-                ${!title.trim() || isSubmitting
-                  ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
-                  : 'bg-indigo-600 text-white hover:bg-indigo-500'
-                }
-              `}
+              className="rounded bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:cursor-not-allowed disabled:bg-gray-700 disabled:text-gray-400"
             >
-              {isSubmitting ? 'Creating...' : 'Create Task'}
+              {isSubmitting ? '创建中...' : '写入 running_tasks.md'}
             </button>
           </div>
         </form>

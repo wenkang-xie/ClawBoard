@@ -13,7 +13,7 @@ function buildDegradedMessage(hasRunsError: boolean, hasTasksError: boolean): st
 }
 
 export function TasksPage() {
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
+  const [createOpen, setCreateOpen] = useState(false)
 
   const {
     data: runsData,
@@ -44,13 +44,12 @@ export function TasksPage() {
   }, [runsUpdatedAt, tasksUpdatedAt])
 
   const handleManualRefresh = () => {
-    refetchRuns()
-    refetchTasks()
+    void refetchRuns()
+    void refetchTasks()
   }
 
-  const handleTaskCreated = () => {
-    // Refetch tasks to show the new task
-    refetchTasks()
+  const handleCreateSuccess = () => {
+    void refetchTasks()
   }
 
   const degradedMessage = buildDegradedMessage(Boolean(runsError), Boolean(tasksError))
@@ -63,38 +62,35 @@ export function TasksPage() {
           <p className="text-sm text-gray-500 mt-1">
             自动轮询任务看板 · {Object.keys(runs).length} 个 subagent 运行记录 · {tasks.length} 个文档任务
           </p>
-        </div>
-
-        <div className="flex flex-col items-start gap-2 rounded-lg border border-gray-800 bg-gray-900/70 px-3 py-2 lg:items-end">
-          <RefreshStatus
-            isRefetching={isRefetching}
-            lastUpdated={lastUpdated}
-            onManualRefresh={handleManualRefresh}
-            autoRefreshInterval={TASKS_POLLING_CONFIG.runsIntervalMs}
-            degradedAfterMs={TASKS_POLLING_CONFIG.degradedAfterMs}
-            isDegraded={Boolean(degradedMessage)}
-            degradedMessage={degradedMessage}
-            idleLabel="轮询已启动"
-          />
-          <p className="text-xs text-gray-600">
-            runs {TASKS_POLLING_CONFIG.runsIntervalMs / 1000}s · tasks {TASKS_POLLING_CONFIG.tasksIntervalMs / 1000}s · stale {TASKS_POLLING_CONFIG.runsStaleTimeMs / 1000}s/{TASKS_POLLING_CONFIG.tasksStaleTimeMs / 1000}s
+          <p className="mt-2 text-xs text-gray-600">
+            新建入口会写入 <code>~/.openclaw/workspace/tasks/running_tasks.md</code>，随后由现有看板自动回显。
           </p>
         </div>
-      </div>
 
-      {/* Action Bar */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-col items-start gap-2 lg:items-end">
           <button
             type="button"
-            onClick={() => setIsCreateModalOpen(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg font-medium transition-colors"
+            onClick={() => setCreateOpen(true)}
+            className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500"
           >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-            新建任务
+            + 新建文档任务
           </button>
+
+          <div className="flex flex-col items-start gap-2 rounded-lg border border-gray-800 bg-gray-900/70 px-3 py-2 lg:items-end">
+            <RefreshStatus
+              isRefetching={isRefetching}
+              lastUpdated={lastUpdated}
+              onManualRefresh={handleManualRefresh}
+              autoRefreshInterval={TASKS_POLLING_CONFIG.runsIntervalMs}
+              degradedAfterMs={TASKS_POLLING_CONFIG.degradedAfterMs}
+              isDegraded={Boolean(degradedMessage)}
+              degradedMessage={degradedMessage}
+              idleLabel="轮询已启动"
+            />
+            <p className="text-xs text-gray-600">
+              runs {TASKS_POLLING_CONFIG.runsIntervalMs / 1000}s · tasks {TASKS_POLLING_CONFIG.tasksIntervalMs / 1000}s · stale {TASKS_POLLING_CONFIG.runsStaleTimeMs / 1000}s/{TASKS_POLLING_CONFIG.tasksStaleTimeMs / 1000}s
+            </p>
+          </div>
         </div>
       </div>
 
@@ -132,11 +128,10 @@ export function TasksPage() {
         )}
       </div>
 
-      {/* Task Create Modal */}
       <TaskCreateModal
-        isOpen={isCreateModalOpen}
-        onClose={() => setIsCreateModalOpen(false)}
-        onSuccess={handleTaskCreated}
+        isOpen={createOpen}
+        onClose={() => setCreateOpen(false)}
+        onSuccess={handleCreateSuccess}
       />
     </div>
   )
