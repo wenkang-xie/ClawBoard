@@ -52,13 +52,13 @@ export function MemoryIndexPanel({
           value={searchText}
           onChange={e => onSearchTextChange(e.target.value)}
           placeholder="搜索文件名 / 路径 / 标签"
-          className="w-full bg-gray-800 text-gray-200 text-sm rounded-md px-3 py-2 border border-gray-700 focus:outline-none focus:border-indigo-500 placeholder-gray-600"
+          className="w-full bg-gray-800 text-gray-200 text-sm rounded-md px-3 py-2 border border-gray-700 focus:outline-none focus:border-primary-500 placeholder-gray-600"
         />
         <div className="flex items-center gap-2">
           <select
             value={category}
             onChange={e => onCategoryChange(e.target.value as V1MemoryCategory | 'all')}
-            className="bg-gray-800 text-gray-200 text-sm rounded-md px-2 py-1.5 border border-gray-700 focus:outline-none focus:border-indigo-500"
+            className="bg-gray-800 text-gray-200 text-sm rounded-md px-2 py-1.5 border border-gray-700 focus:outline-none focus:border-primary-500"
           >
             {categoryOptions.map(item => (
               <option key={item.value} value={item.value}>{item.label}</option>
@@ -80,7 +80,7 @@ export function MemoryIndexPanel({
               onClick={() => onSelect(file.path)}
               className={`w-full text-left px-3 py-2.5 transition-colors ${
                 selected
-                  ? 'bg-indigo-600/20 border-l-2 border-indigo-400'
+                  ? 'bg-primary-600/20 border-l-2 border-primary-400'
                   : 'hover:bg-gray-800/70 border-l-2 border-transparent'
               }`}
             >

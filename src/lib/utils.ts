@@ -48,9 +48,9 @@ export function formatDate(timestamp: number): string {
 
 export function getAgentColor(agentId: string): string {
   const colors: Record<string, string> = {
-    main: '#6366f1',     // indigo
-    architect: '#8b5cf6', // purple
-    research: '#06b6d4',  // cyan
+    main: '#3b82f6',     // blue-500 - primary tech blue
+    architect: '#06b6d4', // cyan-500 - tech cyan
+    research: '#8b5cf6',  // purple - keep for research (different from primary)
     codex: '#10b981',    // emerald
   }
   return colors[agentId] || '#6b7280'

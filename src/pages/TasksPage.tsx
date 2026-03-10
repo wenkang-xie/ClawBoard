@@ -71,7 +71,7 @@ export function TasksPage() {
           <button
             type="button"
             onClick={() => setCreateOpen(true)}
-            className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 transition-colors"
+            className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-500 transition-colors"
           >
             + 新建文档任务
           </button>

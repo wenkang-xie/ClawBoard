@@ -115,7 +115,7 @@ export function TaskCreateModal({ isOpen, onClose, onSuccess }: TaskCreateModalP
               value={title}
               onChange={e => setTitle(e.target.value)}
               placeholder="例如：Sprint4 多 Agent memory 联调"
-              className="w-full rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-gray-100 placeholder-gray-600 focus:border-indigo-500 focus:outline-none"
+              className="w-full rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-gray-100 placeholder-gray-600 focus:border-primary-500 focus:outline-none"
               autoFocus
             />
           </div>
@@ -126,7 +126,7 @@ export function TaskCreateModal({ isOpen, onClose, onSuccess }: TaskCreateModalP
               <select
                 value={ownerAgent}
                 onChange={e => setOwnerAgent(e.target.value)}
-                className="w-full rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-gray-100 focus:border-indigo-500 focus:outline-none"
+                className="w-full rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-gray-100 focus:border-primary-500 focus:outline-none"
               >
                 {ownerOptions.map(option => (
                   <option key={option} value={option}>{option}</option>
@@ -138,7 +138,7 @@ export function TaskCreateModal({ isOpen, onClose, onSuccess }: TaskCreateModalP
               <select
                 value={priority}
                 onChange={e => setPriority(e.target.value as TaskPriority)}
-                className="w-full rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-gray-100 focus:border-indigo-500 focus:outline-none"
+                className="w-full rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-gray-100 focus:border-primary-500 focus:outline-none"
               >
                 <option value="P0">P0</option>
                 <option value="P1">P1</option>
@@ -150,7 +150,7 @@ export function TaskCreateModal({ isOpen, onClose, onSuccess }: TaskCreateModalP
               <select
                 value={status}
                 onChange={e => setStatus(e.target.value as TaskStatus)}
-                className="w-full rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-gray-100 focus:border-indigo-500 focus:outline-none"
+                className="w-full rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-gray-100 focus:border-primary-500 focus:outline-none"
               >
                 <option value="todo">todo</option>
                 <option value="in_progress">in_progress</option>
@@ -167,7 +167,7 @@ export function TaskCreateModal({ isOpen, onClose, onSuccess }: TaskCreateModalP
                 value={tagsText}
                 onChange={e => setTagsText(e.target.value)}
                 placeholder="#agent-dashboard #sprint4"
-                className="w-full rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-gray-100 placeholder-gray-600 focus:border-indigo-500 focus:outline-none"
+                className="w-full rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-gray-100 placeholder-gray-600 focus:border-primary-500 focus:outline-none"
               />
             </div>
             <div>
@@ -176,7 +176,7 @@ export function TaskCreateModal({ isOpen, onClose, onSuccess }: TaskCreateModalP
                 value={due}
                 onChange={e => setDue(e.target.value)}
                 placeholder="2026-03-11 18:00"
-                className="w-full rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-gray-100 placeholder-gray-600 focus:border-indigo-500 focus:outline-none"
+                className="w-full rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-gray-100 placeholder-gray-600 focus:border-primary-500 focus:outline-none"
               />
             </div>
           </div>
@@ -188,7 +188,7 @@ export function TaskCreateModal({ isOpen, onClose, onSuccess }: TaskCreateModalP
               onChange={e => setChecklistText(e.target.value)}
               rows={5}
               placeholder={'补 BFF 接口\n补前端接线\n自测 build'}
-              className="w-full rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-gray-100 placeholder-gray-600 focus:border-indigo-500 focus:outline-none"
+              className="w-full rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-gray-100 placeholder-gray-600 focus:border-primary-500 focus:outline-none"
             />
             {checklist.length > 0 && (
               <p className="mt-2 text-xs text-gray-500">将创建 {checklist.length} 条 checklist</p>
@@ -212,7 +212,7 @@ export function TaskCreateModal({ isOpen, onClose, onSuccess }: TaskCreateModalP
             <button
               type="submit"
               disabled={!title.trim() || isSubmitting}
-              className="rounded bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:cursor-not-allowed disabled:bg-gray-700 disabled:text-gray-400"
+              className="rounded bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-500 disabled:cursor-not-allowed disabled:bg-gray-700 disabled:text-gray-400"
             >
               {isSubmitting ? '创建中...' : '写入 running_tasks.md'}
             </button>

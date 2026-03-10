@@ -94,7 +94,7 @@ export function MemoryPreviewPanel({
       <div className="px-4 py-3 border-b border-gray-800">
         <div className="flex items-center gap-2 flex-wrap">
           <h2 className="text-sm font-semibold text-white">{meta.name}</h2>
-          <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-600/20 text-indigo-300">{selectedFile.category}</span>
+          <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary-600/20 text-primary-300">{selectedFile.category}</span>
           {isPreviewStale && (
             <span className="text-[10px] px-1.5 py-0.5 rounded bg-yellow-900/40 text-yellow-200">stale</span>
           )}

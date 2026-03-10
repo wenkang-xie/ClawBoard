@@ -67,7 +67,7 @@ function RelationList({ title, items, emptyText }: { title: string; items: Sessi
               <div key={item.id} className="rounded border border-gray-800 bg-gray-900/70 p-2">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <Link to={detailHref} className="block truncate text-xs text-indigo-300 hover:text-indigo-200">
+                    <Link to={detailHref} className="block truncate text-xs text-primary-300 hover:text-primary-200">
                       {label}
                     </Link>
                     {sub && <p className="mt-0.5 font-mono text-[11px] text-gray-500">{sub}</p>}

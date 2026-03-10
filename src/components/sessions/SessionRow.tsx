@@ -92,7 +92,7 @@ export function SessionRow({ session, runs = [], depth = 0, expanded = false, on
               e.stopPropagation()
               navigate(`/sessions/${encodeURIComponent(session.key)}`)
             }}
-            className="inline-flex items-center gap-1 rounded-md border border-gray-700 bg-gray-800 px-2 py-1 text-[11px] text-gray-300 hover:border-indigo-500 hover:text-white"
+            className="inline-flex items-center gap-1 rounded-md border border-gray-700 bg-gray-800 px-2 py-1 text-[11px] text-gray-300 hover:border-primary-500 hover:text-white"
             title="查看详情"
           >
             <MdOpenInNew className="text-sm" />
@@ -199,7 +199,7 @@ function MessageItem({ message, index, total }: {
       >
         {expanded ? message.content : contentPreview}
         {isLong && (
-          <span className="text-indigo-400 text-xs ml-1">
+          <span className="text-primary-400 text-xs ml-1">
             {expanded ? ' [收起]' : '... [展开]'}
           </span>
         )}

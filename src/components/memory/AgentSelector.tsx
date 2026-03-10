@@ -25,7 +25,7 @@ export function AgentSelector({ agents, selectedAgentId, onAgentChange, loading 
         value={selectedAgentId}
         onChange={e => onAgentChange(e.target.value)}
         disabled={loading || agents.length === 0}
-        className="rounded-md border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-gray-200 focus:border-indigo-500 focus:outline-none"
+        className="rounded-md border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-gray-200 focus:border-primary-500 focus:outline-none"
       >
         {agents.map(agent => (
           <option key={agent.agentId} value={agent.agentId}>

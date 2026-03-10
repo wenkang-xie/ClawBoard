@@ -44,7 +44,7 @@ export function SessionsPage() {
             onClick={() => setView('list')}
             className={`px-3 py-1.5 rounded-md text-sm transition-colors ${
               view === 'list'
-                ? 'bg-indigo-600 text-white'
+                ? 'bg-primary-600 text-white'
                 : 'text-gray-400 hover:text-gray-200'
             }`}
           >
@@ -54,7 +54,7 @@ export function SessionsPage() {
             onClick={() => setView('tree')}
             className={`px-3 py-1.5 rounded-md text-sm transition-colors ${
               view === 'tree'
-                ? 'bg-indigo-600 text-white'
+                ? 'bg-primary-600 text-white'
                 : 'text-gray-400 hover:text-gray-200'
             }`}
           >

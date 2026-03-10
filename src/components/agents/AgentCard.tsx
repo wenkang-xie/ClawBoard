@@ -62,7 +62,7 @@ export function AgentCard({ agent, sessions: allSessions }: AgentCardProps) {
           <p className="text-xs text-gray-500">Sessions</p>
         </div>
         <div className="text-center bg-gray-800/50 rounded-lg py-2">
-          <p className="text-xl font-bold text-indigo-400">{activeSessions.length}</p>
+          <p className="text-xl font-bold text-primary-400">{activeSessions.length}</p>
           <p className="text-xs text-gray-500">近1小时</p>
         </div>
         <div className="text-center bg-gray-800/50 rounded-lg py-2">
@@ -84,7 +84,7 @@ export function AgentCard({ agent, sessions: allSessions }: AgentCardProps) {
 
       {/* Arrow indicator */}
       <div className="flex justify-end mt-3">
-        <span className="text-xs text-gray-600 group-hover:text-indigo-400 transition-colors">
+        <span className="text-xs text-gray-600 group-hover:text-primary-400 transition-colors">
           查看 Sessions →
         </span>
       </div>

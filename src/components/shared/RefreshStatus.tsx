@@ -79,7 +79,7 @@ export function RefreshStatus({
       {!isRefetching && !showDegraded && secondsAgo !== null && secondsAgo < (autoRefreshInterval / 1000) && (
         <div className="w-16 h-1 bg-gray-800 rounded-full overflow-hidden">
           <div 
-            className="h-full bg-indigo-500 transition-all duration-1000 ease-linear"
+            className="h-full bg-primary-500 transition-all duration-1000 ease-linear"
             style={{ width: `${100 - refreshProgress}%` }}
           />
         </div>

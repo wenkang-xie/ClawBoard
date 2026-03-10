@@ -13,7 +13,7 @@ export function LoadingSpinner({ size = 'md', message, variant = 'default' }: Lo
 
   const borderColor = variant === 'muted' 
     ? 'border-gray-600 border-t-gray-400' 
-    : 'border-indigo-500/30 border-t-indigo-400'
+    : 'border-primary-500/30 border-t-primary-400'
 
   return (
     <div className="flex flex-col items-center justify-center gap-3 p-8">

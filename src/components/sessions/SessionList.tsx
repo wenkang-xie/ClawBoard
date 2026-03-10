@@ -55,12 +55,12 @@ export function SessionList({ sessions, runs = [], defaultAgentFilter }: Session
           placeholder="搜索 session..."
           value={searchText}
           onChange={e => setSearchText(e.target.value)}
-          className="flex-1 min-w-48 bg-gray-800 text-gray-200 text-sm rounded-md px-3 py-1.5 border border-gray-700 focus:outline-none focus:border-indigo-500 placeholder-gray-600"
+          className="flex-1 min-w-48 bg-gray-800 text-gray-200 text-sm rounded-md px-3 py-1.5 border border-gray-700 focus:outline-none focus:border-primary-500 placeholder-gray-600"
         />
         <select
           value={agentFilter}
           onChange={e => setAgentFilter(e.target.value)}
-          className="bg-gray-800 text-gray-200 text-sm rounded-md px-2 py-1.5 border border-gray-700 focus:outline-none focus:border-indigo-500"
+          className="bg-gray-800 text-gray-200 text-sm rounded-md px-2 py-1.5 border border-gray-700 focus:outline-none focus:border-primary-500"
         >
           <option value="">所有 Agent</option>
           {agents.map(a => <option key={a} value={a}>{a}</option>)}
@@ -68,7 +68,7 @@ export function SessionList({ sessions, runs = [], defaultAgentFilter }: Session
         <select
           value={channelFilter}
           onChange={e => setChannelFilter(e.target.value)}
-          className="bg-gray-800 text-gray-200 text-sm rounded-md px-2 py-1.5 border border-gray-700 focus:outline-none focus:border-indigo-500"
+          className="bg-gray-800 text-gray-200 text-sm rounded-md px-2 py-1.5 border border-gray-700 focus:outline-none focus:border-primary-500"
         >
           <option value="">所有 Channel</option>
           {channels.map(c => <option key={c} value={c}>{c}</option>)}

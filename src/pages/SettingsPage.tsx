@@ -70,7 +70,7 @@ export function SettingsPage() {
           <h2 className="text-base font-semibold text-white">Gateway 管理</h2>
           <button
             onClick={() => setShowAddForm(!showAddForm)}
-            className="text-sm bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-md transition-colors"
+            className="text-sm bg-primary-600 hover:bg-primary-700 text-white px-3 py-1.5 rounded-md transition-colors"
           >
             + 添加
           </button>
@@ -88,26 +88,26 @@ export function SettingsPage() {
                     placeholder="显示名称"
                     value={editForm.label}
                     onChange={e => setEditForm(f => ({ ...f, label: e.target.value }))}
-                    className="w-full bg-gray-800 text-gray-200 text-sm rounded-md px-3 py-2 border border-gray-700 focus:outline-none focus:border-indigo-500"
+                    className="w-full bg-gray-800 text-gray-200 text-sm rounded-md px-3 py-2 border border-gray-700 focus:outline-none focus:border-primary-500"
                   />
                   <input
                     type="text"
                     placeholder="WebSocket URL"
                     value={editForm.url}
                     onChange={e => setEditForm(f => ({ ...f, url: e.target.value }))}
-                    className="w-full bg-gray-800 text-gray-200 text-sm rounded-md px-3 py-2 border border-gray-700 focus:outline-none focus:border-indigo-500 font-mono"
+                    className="w-full bg-gray-800 text-gray-200 text-sm rounded-md px-3 py-2 border border-gray-700 focus:outline-none focus:border-primary-500 font-mono"
                   />
                   <input
                     type="text"
                     placeholder="Auth Token"
                     value={editForm.token}
                     onChange={e => setEditForm(f => ({ ...f, token: e.target.value }))}
-                    className="w-full bg-gray-800 text-gray-200 text-sm rounded-md px-3 py-2 border border-gray-700 focus:outline-none focus:border-indigo-500 font-mono"
+                    className="w-full bg-gray-800 text-gray-200 text-sm rounded-md px-3 py-2 border border-gray-700 focus:outline-none focus:border-primary-500 font-mono"
                   />
                   <div className="flex gap-2">
                     <button
                       onClick={() => saveEdit(gateway.id)}
-                      className="text-sm bg-indigo-600 text-white px-3 py-1.5 rounded-md hover:bg-indigo-700"
+                      className="text-sm bg-primary-600 text-white px-3 py-1.5 rounded-md hover:bg-primary-700"
                     >
                       保存
                     </button>
@@ -128,7 +128,7 @@ export function SettingsPage() {
                         {gateway.label || gateway.url}
                       </span>
                       {store.activeGatewayId === gateway.id && (
-                        <span className="text-xs bg-indigo-600/20 text-indigo-400 px-1.5 py-0.5 rounded">
+                        <span className="text-xs bg-primary-600/20 text-primary-400 px-1.5 py-0.5 rounded">
                           当前
                         </span>
                       )}
@@ -151,7 +151,7 @@ export function SettingsPage() {
                     <button
                       onClick={() => handleTest(gateway)}
                       disabled={testingId === gateway.id}
-                      className="text-xs text-indigo-400 hover:text-indigo-300 px-2 py-1 rounded hover:bg-gray-800 transition-colors"
+                      className="text-xs text-primary-400 hover:text-primary-300 px-2 py-1 rounded hover:bg-gray-800 transition-colors"
                     >
                       {testingId === gateway.id ? '测试中...' : '测试'}
                     </button>
@@ -185,27 +185,27 @@ export function SettingsPage() {
               placeholder="显示名称（如：远程服务器）"
               value={newGateway.label}
               onChange={e => setNewGateway(f => ({ ...f, label: e.target.value }))}
-              className="w-full bg-gray-800 text-gray-200 text-sm rounded-md px-3 py-2 border border-gray-700 focus:outline-none focus:border-indigo-500"
+              className="w-full bg-gray-800 text-gray-200 text-sm rounded-md px-3 py-2 border border-gray-700 focus:outline-none focus:border-primary-500"
             />
             <input
               type="text"
               placeholder="WebSocket URL（如：wss://example.ts.net）"
               value={newGateway.url}
               onChange={e => setNewGateway(f => ({ ...f, url: e.target.value }))}
-              className="w-full bg-gray-800 text-gray-200 text-sm rounded-md px-3 py-2 border border-gray-700 focus:outline-none focus:border-indigo-500 font-mono"
+              className="w-full bg-gray-800 text-gray-200 text-sm rounded-md px-3 py-2 border border-gray-700 focus:outline-none focus:border-primary-500 font-mono"
             />
             <input
               type="text"
               placeholder="Auth Token"
               value={newGateway.token}
               onChange={e => setNewGateway(f => ({ ...f, token: e.target.value }))}
-              className="w-full bg-gray-800 text-gray-200 text-sm rounded-md px-3 py-2 border border-gray-700 focus:outline-none focus:border-indigo-500 font-mono"
+              className="w-full bg-gray-800 text-gray-200 text-sm rounded-md px-3 py-2 border border-gray-700 focus:outline-none focus:border-primary-500 font-mono"
             />
             <div className="flex gap-2">
               <button
                 onClick={handleAdd}
                 disabled={!newGateway.url}
-                className="text-sm bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 disabled:opacity-50"
+                className="text-sm bg-primary-600 text-white px-4 py-2 rounded-md hover:bg-primary-700 disabled:opacity-50"
               >
                 添加
               </button>
@@ -232,7 +232,7 @@ export function SettingsPage() {
             <select
               value={store.refreshInterval}
               onChange={e => updateRefreshInterval(Number(e.target.value))}
-              className="bg-gray-800 text-gray-200 text-sm rounded-md px-3 py-2 border border-gray-700 focus:outline-none focus:border-indigo-500"
+              className="bg-gray-800 text-gray-200 text-sm rounded-md px-3 py-2 border border-gray-700 focus:outline-none focus:border-primary-500"
             >
               <option value={5000}>5 秒</option>
               <option value={10000}>10 秒</option>

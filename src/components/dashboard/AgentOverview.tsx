@@ -33,8 +33,8 @@ export function AgentOverview({ agents, sessions }: AgentOverviewProps) {
   }
 
   return (
-    <div className="bg-gray-900/80 border border-gray-800 rounded-xl p-5">
-      <h3 className="text-base font-semibold text-white mb-4">Agent 快览</h3>
+    <div className="bg-gray-900/80 dark:bg-gray-900/80 light:bg-white border border-gray-800 dark:border-gray-800 light:border-slate-200 rounded-xl p-5">
+      <h3 className="text-base font-semibold text-white dark:text-white light:text-slate-900 mb-4">Agent 快览</h3>
       <div className="space-y-3">
         {agents.map(agent => {
           const recentSession = getRecentSession(agent.agentId)
@@ -46,7 +46,7 @@ export function AgentOverview({ agents, sessions }: AgentOverviewProps) {
           return (
             <div
               key={agent.agentId}
-              className="flex items-center gap-3 p-3 rounded-lg bg-gray-800/50 hover:bg-gray-800 transition-colors"
+              className="flex items-center gap-3 p-3 rounded-lg bg-gray-800/50 dark:bg-gray-800/50 light:bg-slate-50 hover:bg-gray-800 dark:hover:bg-gray-800 light:hover:bg-slate-100 transition-colors"
             >
               {/* Avatar */}
               <div
@@ -59,14 +59,14 @@ export function AgentOverview({ agents, sessions }: AgentOverviewProps) {
               {/* Info */}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium text-white">{name}</span>
+                  <span className="text-sm font-medium text-white dark:text-white light:text-slate-900">{name}</span>
                   {activeCount > 0 && (
-                    <span className="text-xs bg-indigo-500/20 text-indigo-400 px-1.5 py-0.5 rounded">
+                    <span className="text-xs bg-primary/20 text-primary px-1.5 py-0.5 rounded">
                       {activeCount} 活跃
                     </span>
                   )}
                 </div>
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-gray-500 dark:text-gray-500 light:text-slate-500">
                   {agent.sessions?.count ?? 0} sessions
                   {recentSession && ` · 最近 ${formatRelativeTime(recentSession.updatedAt)}`}
                 </p>
@@ -74,13 +74,13 @@ export function AgentOverview({ agents, sessions }: AgentOverviewProps) {
 
               {/* Total sessions count */}
               <div className="text-right">
-                <p className="text-lg font-semibold text-white">{agent.sessions?.count ?? 0}</p>
+                <p className="text-lg font-semibold text-white dark:text-white light:text-slate-900">{agent.sessions?.count ?? 0}</p>
               </div>
             </div>
           )
         })}
         {agents.length === 0 && (
-          <p className="text-sm text-gray-600 text-center py-4">暂无 Agent 数据</p>
+          <p className="text-sm text-gray-600 dark:text-gray-600 light:text-slate-500 text-center py-4">暂无 Agent 数据</p>
         )}
       </div>
     </div>

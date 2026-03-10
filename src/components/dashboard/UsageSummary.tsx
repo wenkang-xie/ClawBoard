@@ -153,13 +153,13 @@ function SummaryMetric({
   detail?: string
 }) {
   return (
-    <div className="rounded-xl border border-gray-800 bg-gray-950/60 px-4 py-3">
-      <p className="text-xs uppercase tracking-[0.18em] text-gray-500">{label}</p>
+    <div className="rounded-xl border border-gray-800 dark:border-gray-800 light:border-slate-200 bg-gray-950/60 dark:bg-gray-950/60 light:bg-slate-50 px-4 py-3">
+      <p className="text-xs uppercase tracking-[0.18em] text-gray-500 dark:text-gray-500 light:text-slate-500">{label}</p>
       <div className="mt-2 flex items-end gap-2">
-        <p className="text-2xl font-semibold text-white">{value}</p>
-        {delta && <span className="pb-1 text-xs text-gray-400">{delta}</span>}
+        <p className="text-2xl font-semibold text-white dark:text-white light:text-slate-900">{value}</p>
+        {delta && <span className="pb-1 text-xs text-gray-400 dark:text-gray-400 light:text-slate-500">{delta}</span>}
       </div>
-      {detail && <p className="mt-1 text-xs text-gray-600">{detail}</p>}
+      {detail && <p className="mt-1 text-xs text-gray-600 dark:text-gray-600 light:text-slate-500">{detail}</p>}
     </div>
   )
 }
@@ -178,18 +178,18 @@ function BreakdownRow({
   barColor: string
 }) {
   return (
-    <div className="rounded-lg border border-gray-800 bg-gray-950/50 p-3">
+    <div className="rounded-lg border border-gray-800 dark:border-gray-800 light:border-slate-200 bg-gray-950/50 dark:bg-gray-950/50 light:bg-white/50 p-3">
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
-          <p className="truncate text-sm font-medium text-white">{label}</p>
-          <p className="truncate text-xs text-gray-500">{sublabel}</p>
+          <p className="truncate text-sm font-medium text-white dark:text-white light:text-slate-900">{label}</p>
+          <p className="truncate text-xs text-gray-500 dark:text-gray-500 light:text-slate-500">{sublabel}</p>
         </div>
         <div className="text-right">
-          <p className="text-sm text-gray-200">{value}</p>
-          <p className="text-xs text-gray-500">{percent}%</p>
+          <p className="text-sm text-gray-200 dark:text-gray-200 light:text-slate-700">{value}</p>
+          <p className="text-xs text-gray-500 dark:text-gray-500 light:text-slate-500">{percent}%</p>
         </div>
       </div>
-      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-gray-800">
+      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-gray-800 dark:bg-gray-800 light:bg-slate-200">
         <div className="h-full rounded-full transition-all duration-300" style={{ width: `${percent}%`, backgroundColor: barColor }} />
       </div>
     </div>
@@ -254,11 +254,11 @@ export function UsageSummary({
     : 0
 
   return (
-    <div className="rounded-xl border border-gray-800 bg-gray-900 p-5">
+    <div className="rounded-xl border border-gray-800 dark:border-gray-800 light:border-slate-200 bg-gray-900 dark:bg-gray-900 light:bg-white p-5">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <h3 className="text-base font-semibold text-white">Token Dashboard</h3>
-          <p className="mt-1 text-sm text-gray-500">
+          <h3 className="text-base font-semibold text-white dark:text-white light:text-slate-900">Token Dashboard</h3>
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-500 light:text-slate-500">
             {view.rangeLabel}内观察 token 趋势、模型分布和 agent 分布
           </p>
         </div>
@@ -282,8 +282,8 @@ export function UsageSummary({
                 onClick={() => setRange(option.value)}
                 className={`rounded-md px-2.5 py-1 text-xs transition-colors ${
                   range === option.value
-                    ? 'bg-indigo-600 text-white'
-                    : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                    ? 'bg-primary text-white'
+                    : 'bg-gray-800 dark:bg-gray-800 light:bg-slate-100 text-gray-400 dark:text-gray-400 light:text-slate-600 hover:bg-gray-700 dark:hover:bg-gray-700 light:hover:bg-slate-200'
                 }`}
               >
                 {option.label}
@@ -319,13 +319,13 @@ export function UsageSummary({
       </div>
 
       <div className="mt-5 grid gap-4 xl:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)_minmax(0,1fr)]">
-        <div className="rounded-xl border border-gray-800 bg-gray-950/50 p-4">
+        <div className="rounded-xl border border-gray-800 dark:border-gray-800 light:border-slate-200 bg-gray-950/50 dark:bg-gray-950/50 light:bg-slate-50 p-4">
           <div className="mb-3 flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-white">Trend Over Time</p>
-              <p className="text-xs text-gray-500">按天聚合 token 消耗</p>
+              <p className="text-sm font-medium text-white dark:text-white light:text-slate-900">Trend Over Time</p>
+              <p className="text-xs text-gray-500 dark:text-gray-500 light:text-slate-500">按天聚合 token 消耗</p>
             </div>
-            <p className="text-xs text-gray-600">{view.chartData.length} points</p>
+            <p className="text-xs text-gray-600 dark:text-gray-600 light:text-slate-500">{view.chartData.length} points</p>
           </div>
 
           {view.chartData.length > 0 ? (
@@ -333,8 +333,8 @@ export function UsageSummary({
               <AreaChart data={view.chartData} margin={{ top: 8, right: 8, left: -12, bottom: 0 }}>
                 <defs>
                   <linearGradient id="usageTrendFill" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#6366f1" stopOpacity={0.45} />
-                    <stop offset="95%" stopColor="#6366f1" stopOpacity={0.03} />
+                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.45} />
+                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.03} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid stroke="#1f2937" vertical={false} strokeDasharray="3 3" />
@@ -362,25 +362,25 @@ export function UsageSummary({
                 <Area
                   type="monotone"
                   dataKey="tokens"
-                  stroke="#818cf8"
+                  stroke="#60a5fa"
                   strokeWidth={2}
                   fill="url(#usageTrendFill)"
                   dot={false}
-                  activeDot={{ r: 4, fill: '#a5b4fc' }}
+                  activeDot={{ r: 4, fill: '#93c5fd' }}
                 />
               </AreaChart>
             </ResponsiveContainer>
           ) : (
-            <div className="flex h-[260px] items-center justify-center text-sm text-gray-600">
+            <div className="flex h-[260px] items-center justify-center text-sm text-gray-600 dark:text-gray-600 light:text-slate-500">
               暂无 usage 趋势数据
             </div>
           )}
         </div>
 
-        <div className="rounded-xl border border-gray-800 bg-gray-950/50 p-4">
+        <div className="rounded-xl border border-gray-800 dark:border-gray-800 light:border-slate-200 bg-gray-950/50 dark:bg-gray-950/50 light:bg-slate-50 p-4">
           <div className="mb-3">
-            <p className="text-sm font-medium text-white">By Model</p>
-            <p className="text-xs text-gray-500">
+            <p className="text-sm font-medium text-white dark:text-white light:text-slate-900">By Model</p>
+            <p className="text-xs text-gray-500 dark:text-gray-500 light:text-slate-500">
               {view.modelPrecise ? '使用当前窗口内模型明细' : '缺少窗口级明细，回退到总聚合'}
             </p>
           </div>
@@ -394,20 +394,20 @@ export function UsageSummary({
                   sublabel={`${model.provider} · ${formatCost(model.cost)}`}
                   value={formatTokens(model.tokens)}
                   percent={percent}
-                  barColor="#6366f1"
+                  barColor="#3b82f6"
                 />
               )
             })}
             {view.modelBreakdown.length === 0 && (
-              <p className="py-10 text-center text-sm text-gray-600">暂无模型维度数据</p>
+              <p className="py-10 text-center text-sm text-gray-600 dark:text-gray-600 light:text-slate-500">暂无模型维度数据</p>
             )}
           </div>
         </div>
 
-        <div className="rounded-xl border border-gray-800 bg-gray-950/50 p-4">
+        <div className="rounded-xl border border-gray-800 dark:border-gray-800 light:border-slate-200 bg-gray-950/50 dark:bg-gray-950/50 light:bg-slate-50 p-4">
           <div className="mb-3">
-            <p className="text-sm font-medium text-white">By Agent</p>
-            <p className="text-xs text-gray-500">
+            <p className="text-sm font-medium text-white dark:text-white light:text-slate-900">By Agent</p>
+            <p className="text-xs text-gray-500 dark:text-gray-500 light:text-slate-500">
               {view.agentPrecise ? '按 session 活动聚合到 agent' : '缺少窗口级明细，回退到总聚合'}
             </p>
           </div>
@@ -426,13 +426,13 @@ export function UsageSummary({
               )
             })}
             {view.agentBreakdown.length === 0 && (
-              <p className="py-10 text-center text-sm text-gray-600">暂无 agent 维度数据</p>
+              <p className="py-10 text-center text-sm text-gray-600 dark:text-gray-600 light:text-slate-500">暂无 agent 维度数据</p>
             )}
           </div>
         </div>
       </div>
 
-      <div className="mt-4 flex flex-col gap-1 text-xs text-gray-600 md:flex-row md:items-center md:justify-between">
+      <div className="mt-4 flex flex-col gap-1 text-xs text-gray-600 dark:text-gray-600 light:text-slate-500 md:flex-row md:items-center md:justify-between">
         <span>数据范围: {usage.startDate || '-'} ~ {usage.endDate || '-'}</span>
         <span>Gateway updatedAt: {usage.updatedAt ? new Date(usage.updatedAt).toLocaleString('zh-CN') : '-'}</span>
       </div>
