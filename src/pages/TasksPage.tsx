@@ -1,8 +1,9 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { TASKS_POLLING_CONFIG, useBffTasks, useRunsJson } from '../hooks/useFileData'
 import { KanbanBoard } from '../components/tasks/KanbanBoard'
 import { LoadingSpinner } from '../components/shared/LoadingSpinner'
 import { RefreshStatus } from '../components/shared/RefreshStatus'
+import { TaskCreateModal } from '../components/tasks/TaskCreateModal'
 
 function buildDegradedMessage(hasRunsError: boolean, hasTasksError: boolean): string | undefined {
   if (hasRunsError && hasTasksError) return 'runs/tasks 刷新失败'
@@ -12,6 +13,8 @@ function buildDegradedMessage(hasRunsError: boolean, hasTasksError: boolean): st
 }
 
 export function TasksPage() {
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
+
   const {
     data: runsData,
     isLoading: runsLoading,
@@ -45,6 +48,11 @@ export function TasksPage() {
     refetchTasks()
   }
 
+  const handleTaskCreated = () => {
+    // Refetch tasks to show the new task
+    refetchTasks()
+  }
+
   const degradedMessage = buildDegradedMessage(Boolean(runsError), Boolean(tasksError))
 
   return (
@@ -71,6 +79,22 @@ export function TasksPage() {
           <p className="text-xs text-gray-600">
             runs {TASKS_POLLING_CONFIG.runsIntervalMs / 1000}s · tasks {TASKS_POLLING_CONFIG.tasksIntervalMs / 1000}s · stale {TASKS_POLLING_CONFIG.runsStaleTimeMs / 1000}s/{TASKS_POLLING_CONFIG.tasksStaleTimeMs / 1000}s
           </p>
+        </div>
+      </div>
+
+      {/* Action Bar */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setIsCreateModalOpen(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg font-medium transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            新建任务
+          </button>
         </div>
       </div>
 
@@ -107,6 +131,13 @@ export function TasksPage() {
           <span>共 {Object.keys(runs).length} 条运行记录</span>
         )}
       </div>
+
+      {/* Task Create Modal */}
+      <TaskCreateModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        onSuccess={handleTaskCreated}
+      />
     </div>
   )
 }

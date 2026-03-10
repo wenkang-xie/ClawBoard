@@ -20,6 +20,30 @@ const MEMORY_INDEX_FILE = path.join(WORKSPACE_DIR, 'MEMORY.md')
 const SUBAGENT_RUNS_FILE = path.join(OPENCLAW_HOME, 'subagents/runs.json')
 const AGENTS_DIR = path.join(OPENCLAW_HOME, 'agents')
 
+// Helper to get memory directory for a specific agent (or default workspace)
+function getMemoryDirForAgent(agentId) {
+  if (!agentId) return MEMORY_DIR
+  const agentMemoryDir = path.join(AGENTS_DIR, agentId, 'memory')
+  // Check if agent memory directory exists, fallback to default
+  if (fs.existsSync(agentMemoryDir)) {
+    return agentMemoryDir
+  }
+  return MEMORY_DIR
+}
+
+// Helper to get agents list
+function getAgentsList() {
+  try {
+    const agents = fs.readdirSync(AGENTS_DIR, { withFileTypes: true })
+    return agents
+      .filter(a => a.isDirectory())
+      .map(a => a.name)
+      .sort()
+  } catch {
+    return []
+  }
+}
+
 const SESSION_DETAIL_TTL_MS = 8_000
 const LOCAL_INDEX_TTL_MS = 4_000
 const sessionDetailCache = new Map()
@@ -1013,6 +1037,66 @@ const server = http.createServer(async (req, res) => {
     return
   }
 
+  // POST /api/tasks - Create new task
+  if (req.method === 'POST' && pathname === '/api/tasks') {
+    try {
+      let body = ''
+      for await (const chunk of req) {
+        body += chunk
+      }
+      const { title, status = 'todo', checkboxes = [] } = JSON.parse(body)
+
+      if (!title || !title.trim()) {
+        apiError(res, 400, 'INVALID_TASK_TITLE', '任务标题不能为空')
+        return
+      }
+
+      const taskId = `TASK-${Date.now().toString(36).toUpperCase()}`
+      const timestamp = new Date().toISOString().split('T')[0]
+      
+      // Build task markdown
+      let taskMd = `\n## [${taskId}] ${title.trim()}\n\n`
+      if (checkboxes.length > 0) {
+        for (const cb of checkboxes) {
+          taskMd += `- [ ] ${cb.text || ''}\n`
+        }
+        taskMd += '\n'
+      }
+      taskMd += `> Created: ${timestamp} | Status: ${status}\n`
+
+      // Append to running_tasks.md
+      const currentMd = fs.existsSync(TASKS_FILE) ? fs.readFileSync(TASKS_FILE, 'utf-8') : ''
+      const updatedMd = currentMd.trim() + taskMd
+      fs.writeFileSync(TASKS_FILE, updatedMd + '\n', 'utf-8')
+
+      json(res, 201, {
+        ok: true,
+        ts: Date.now(),
+        taskId,
+        message: 'Task created successfully',
+      })
+    } catch (err) {
+      apiError(res, 500, 'TASK_CREATE_FAILED', '创建任务失败', String(err))
+    }
+    return
+  }
+
+  // GET /api/agents - List available agents
+  if (req.method === 'GET' && pathname === '/api/agents') {
+    try {
+      const agents = getAgentsList()
+      json(res, 200, {
+        ok: true,
+        ts: Date.now(),
+        agents,
+        count: agents.length,
+      })
+    } catch (err) {
+      apiError(res, 500, 'AGENTS_LIST_FAILED', '获取 Agent 列表失败', String(err))
+    }
+    return
+  }
+
   // GET /api/memory
   if (req.method === 'GET' && pathname === '/api/memory') {
     const result = scanMemoryDir(MEMORY_DIR)
@@ -1051,28 +1135,37 @@ const server = http.createServer(async (req, res) => {
 
   // ── Memory v1 endpoints ───────────────────────────────────────────────────
 
-  // GET /api/v1/memory/tree
+  // GET /api/v1/memory/tree?agentId=<agent>
   if (req.method === 'GET' && pathname === '/api/v1/memory/tree') {
-    const result = scanMemoryDirV1(MEMORY_DIR)
+    const agentId = url.searchParams.get('agentId') || ''
+    const memoryDir = getMemoryDirForAgent(agentId)
+    const result = scanMemoryDirV1(memoryDir)
+    const warnings = [...result.warnings]
+    if (agentId && memoryDir === MEMORY_DIR) {
+      warnings.push(`Agent "${agentId}" memory not found, falling back to default workspace`)
+    }
     json(res, result.error ? 500 : 200, {
       ok: !result.error,
       ts: Date.now(),
-      source: MEMORY_DIR,
+      source: memoryDir,
+      agentId: agentId || null,
       data: {
         tree: result.tree,
         totalFiles: result.flatFiles.length,
         partial: result.partial,
-        warnings: result.warnings,
+        warnings,
       },
     })
     return
   }
 
-  // GET /api/v1/memory/list?sort=modified|name&category=<cat>
+  // GET /api/v1/memory/list?sort=modified|name&category=<cat>&agentId=<agent>
   if (req.method === 'GET' && pathname === '/api/v1/memory/list') {
     const sort = url.searchParams.get('sort') || 'modified'
     const categoryFilter = url.searchParams.get('category') || ''
-    const result = scanMemoryDirV1(MEMORY_DIR)
+    const agentId = url.searchParams.get('agentId') || ''
+    const memoryDir = getMemoryDirForAgent(agentId)
+    const result = scanMemoryDirV1(memoryDir)
 
     let files = result.flatFiles
     if (categoryFilter) {
@@ -1084,15 +1177,21 @@ const server = http.createServer(async (req, res) => {
       files = [...files].sort((a, b) => (b.modifiedAt || 0) - (a.modifiedAt || 0))
     }
 
+    const warnings = [...result.warnings]
+    if (agentId && memoryDir === MEMORY_DIR) {
+      warnings.push(`Agent "${agentId}" memory not found, falling back to default workspace`)
+    }
+
     json(res, result.error ? 500 : 200, {
       ok: !result.error,
       ts: Date.now(),
-      source: MEMORY_DIR,
+      source: memoryDir,
+      agentId: agentId || null,
       data: {
         files,
         total: files.length,
         partial: result.partial,
-        warnings: result.warnings,
+        warnings,
       },
     })
     return
@@ -1321,11 +1420,13 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(PORT, '127.0.0.1', () => {
   console.log(`✅ BFF running at http://127.0.0.1:${PORT}`)
-  console.log(`   GET /api/tasks`)
+  console.log(`   GET  /api/tasks`)
+  console.log(`   POST /api/tasks   (create task)`)
+  console.log(`   GET  /api/agents (list agents)`)
   console.log(`   GET /api/memory                              (legacy)`)
   console.log(`   GET /api/memory/file?path=<p>&maxChars=<n>  (legacy)`)
-  console.log(`   GET /api/v1/memory/tree`)
-  console.log(`   GET /api/v1/memory/list?sort=modified|name&category=<cat>`)
+  console.log(`   GET /api/v1/memory/tree?agentId=<agent>`)
+  console.log(`   GET /api/v1/memory/list?sort=...&category=<cat>&agentId=<agent>`)
   console.log(`   GET /api/v1/memory/preview?path=<p>&maxChars=<n>`)
   console.log(`   GET /api/v1/memory/detail?path=<p>&maxChars=<n>`)
   console.log(`   GET /api/runs`)

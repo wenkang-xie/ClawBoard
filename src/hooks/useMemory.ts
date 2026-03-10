@@ -210,6 +210,8 @@ export interface V1MemoryListData {
   total: number
   partial: boolean
   warnings: string[]
+  source?: string  // Added for agent-aware memory
+  agentId?: string | null  // Added for agent-aware memory
 }
 
 export interface V1MemoryHeading {
@@ -248,12 +250,34 @@ export function useMemoryTree() {
   })
 }
 
-export function useMemoryList(sort: 'modified' | 'name' = 'modified', category?: V1MemoryCategory) {
+export function useMemoryTreeWithAgent(agentId: string | null) {
+  return useQuery<V1MemoryTreeData>({
+    queryKey: ['memory-v1-tree', agentId],
+    queryFn: async (): Promise<V1MemoryTreeData> => {
+      const params = new URLSearchParams()
+      if (agentId) params.set('agentId', agentId)
+      const url = `${BFF_BASE}/api/v1/memory/tree?${params}`
+      const resp = await fetch(url)
+      if (!resp.ok) throw new Error(`BFF /api/v1/memory/tree HTTP ${resp.status}`)
+      const json = await resp.json()
+      if (!json.ok) throw new Error(json.error?.message || 'memory tree error')
+      return json.data as V1MemoryTreeData
+    },
+    enabled: true,
+    refetchInterval: 30_000,
+    refetchIntervalInBackground: false,
+    staleTime: 20_000,
+    retry: 1,
+  })
+}
+
+export function useMemoryList(sort: 'modified' | 'name' = 'modified', category?: V1MemoryCategory, agentId?: string | null) {
   return useQuery<V1MemoryListData>({
-    queryKey: ['memory-v1-list', sort, category ?? ''],
+    queryKey: ['memory-v1-list', sort, category ?? '', agentId ?? ''],
     queryFn: async (): Promise<V1MemoryListData> => {
       const params = new URLSearchParams({ sort })
       if (category) params.set('category', category)
+      if (agentId) params.set('agentId', agentId)
       const resp = await fetch(`${BFF_BASE}/api/v1/memory/list?${params}`)
       if (!resp.ok) throw new Error(`BFF /api/v1/memory/list HTTP ${resp.status}`)
       const json = await resp.json()
@@ -263,6 +287,32 @@ export function useMemoryList(sort: 'modified' | 'name' = 'modified', category?:
     refetchInterval: 30_000,
     refetchIntervalInBackground: false,
     staleTime: 20_000,
+    retry: 1,
+  })
+}
+
+// ── Agents list hook ─────────────────────────────────────────────────────────
+
+export interface AgentsListResponse {
+  ok: boolean
+  ts: number
+  agents: string[]
+  count: number
+}
+
+export function useAgentsList() {
+  return useQuery<AgentsListResponse>({
+    queryKey: ['agents-list'],
+    queryFn: async (): Promise<AgentsListResponse> => {
+      const resp = await fetch(`${BFF_BASE}/api/agents`)
+      if (!resp.ok) throw new Error(`BFF /api/agents HTTP ${resp.status}`)
+      const json = await resp.json()
+      if (!json.ok) throw new Error(json.error?.message || 'agents list error')
+      return json as AgentsListResponse
+    },
+    refetchInterval: 60_000,
+    refetchIntervalInBackground: false,
+    staleTime: 50_000,
     retry: 1,
   })
 }
