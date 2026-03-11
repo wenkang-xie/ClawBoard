@@ -23,6 +23,11 @@
   <br/><em>Tasks — 看板与自动刷新</em>
 </p>
 
+<p align="center">
+  <img src="./docs/screenshots/sessions.png" alt="Sessions" width="800" />
+  <br/><em>Sessions — Session 列表、详情、relations</em>
+</p>
+
 ## 功能
 
 - **Dashboard**：查看 gateway 健康状态、token 趋势、模型/agent 分布

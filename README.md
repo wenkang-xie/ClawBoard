@@ -23,6 +23,11 @@ English | [简体中文](./README.zh-CN.md)
   <br/><em>Tasks — Kanban board with auto-refresh</em>
 </p>
 
+<p align="center">
+  <img src="./docs/screenshots/sessions.png" alt="Sessions" width="800" />
+  <br/><em>Sessions — Session list, detail view, relations</em>
+</p>
+
 ## Features
 
 ## Features
