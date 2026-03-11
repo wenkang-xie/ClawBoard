@@ -2,6 +2,10 @@
 
 English | [简体中文](./README.zh-CN.md)
 
+<p align="center">
+  <img src="./docs/screenshots/setup-page.png" alt="ClawBoard Setup" width="800" />
+</p>
+
 ClawBoard is an OpenClaw dashboard for monitoring sessions, memory, tasks, agents, and token usage in one place.
 
 ## Features
