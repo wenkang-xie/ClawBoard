@@ -1,104 +1,135 @@
-# Agent Dashboard
+# ClawBoard
 
-OpenClaw 多 Agent 管理端，可视化监控 Agent 运行状态、任务与记忆。
+English | [简体中文](./README.zh-CN.md)
 
-## 功能
+ClawBoard is an OpenClaw dashboard for monitoring sessions, memory, tasks, agents, and token usage in one place.
 
-- **Dashboard**：实时监控 Gateway 状态、Token 消耗趋势、模型/Agent 分布
-- **Sessions**：Session 列表与详情页，支持 relations/runs 关联查看
-- **Memory**：多 Agent 记忆索引与预览（main/architect/research/designer）
-- **Tasks**：任务看板 + 自动轮询 + 新建任务入口
-- **Agents**：Agent 配置与状态
-- **Settings**：系统配置
+## Features
 
-## 技术栈
+- **Dashboard** — gateway health, token trends, model/agent distribution
+- **Sessions** — session list, detail view, relations, and event timeline
+- **Memory** — multi-agent memory browser and preview
+- **Tasks** — kanban view, auto-refresh, and task creation entry
+- **Agents** — agent overview and status
+- **Settings / Setup** — first-run setup flow and environment-based configuration
+
+## Tech Stack
 
 - Vite + React 18 + TypeScript
-- TailwindCSS
-- BFF 层（Node.js）
+- Tailwind CSS
+- Lightweight Node.js BFF
 
-## 快速启动
+## Quick Start
 
-### 开发模式
+### 1. Clone and install
 
 ```bash
-# 复制环境配置文件
-cp .env.example .env
+git clone https://github.com/wenkang-xie/ClawBoard.git
+cd ClawBoard
+npm install
+```
 
-# 终端1：BFF（必须）
+### 2. Configure environment
+
+```bash
+cp .env.example .env
+```
+
+Then edit `.env` if needed.
+
+### 3. Start the services
+
+```bash
+# terminal 1
 npm run bff
 
-# 终端2：前端
+# terminal 2
 npm run dev
 ```
 
-- 前端：http://127.0.0.1:5173
-- BFF：http://127.0.0.1:18902
+- Frontend: `http://127.0.0.1:5173`
+- BFF: `http://127.0.0.1:18902`
 
-### 配置
+## First-Run Setup
 
-项目使用环境变量配置，复制 `.env.example` 后根据需要修改：
+If the project is not configured yet, ClawBoard shows a setup page that helps the user:
 
-| 变量 | 默认值 | 说明 |
-|------|--------|------|
-| `VITE_BFF_BASE` | `http://127.0.0.1:18902` | BFF 服务地址 |
-| `VITE_GATEWAY_WS_URL` | `ws://localhost:18789` | Gateway WebSocket |
-| `BFF_PORT` | `18902` | BFF 服务端口 |
-| `OPENCLAW_HOME` | `~/.openclaw` | OpenClaw 根目录 |
+- enter the OpenClaw Gateway WebSocket URL
+- set the BFF port
+- set the OpenClaw home directory
+- generate a `.env` file for local startup
 
-> 注意：前端使用 `VITE_` 前缀的环境变量（Vite 要求）。
+## Configuration
 
-### 生产构建
+ClawBoard uses environment variables for local adaptation.
+
+| Variable | Default | Description |
+|---|---|---|
+| `BFF_PORT` | `18902` | BFF port |
+| `BFF_HOST` | `127.0.0.1` | BFF bind host |
+| `VITE_BFF_BASE` | `http://127.0.0.1:18902` | Frontend BFF base URL |
+| `VITE_GATEWAY_WS_URL` | `ws://localhost:18789` | OpenClaw Gateway WebSocket URL |
+| `OPENCLAW_HOME` | `~/.openclaw` | OpenClaw home directory |
+| `TASKS_FILE` | derived | Optional custom tasks file path |
+| `MEMORY_DIR` | derived | Optional custom memory directory |
+
+> Frontend-exposed variables must use the `VITE_` prefix.
+
+## Production Build
 
 ```bash
 npm run build
-
-# 预览
 npm run preview
 ```
 
-构建产物在 `dist/`，可部署到任意静态托管（Vercel/Netlify/nginx）。
+Build output is written to `dist/`.
 
-### BFF 进程管理
+For the BFF, use a process manager such as `pm2` or `systemd`.
 
-生产环境建议用 pm2 或 systemd 管理 BFF 进程：
+Example:
 
 ```bash
-pm2 start "npm run bff" --name agent-dashboard-bff
+pm2 start "npm run bff" --name clawboard-bff
 ```
 
-## 目录结构
+## Project Structure
 
+```text
+src/
+  components/
+  hooks/
+  lib/
+  pages/
+  App.tsx
+server/
+  index.js
+docs/
+public/
 ```
-├── src/
-│   ├── components/     # React 组件
-│   ├── pages/         # 页面
-│   ├── hooks/         # 自定义 Hooks
-│   ├── lib/           # 工具函数
-│   └── App.tsx        # 路由
-├── server/
-│   └── index.js       # BFF 服务
-├── docs/              # 设计文档
-└── public/            # 静态资源
-```
 
-## API
+## BFF API
 
-BFF 提供以下接口：
+| Method | Endpoint | Purpose |
+|---|---|---|
+| GET | `/api/tasks` | list document-backed tasks |
+| POST | `/api/tasks` | create a new task |
+| GET | `/api/runs` | list subagent runs |
+| GET | `/api/sessions` | list sessions |
+| GET | `/api/sessions/:key/detail` | session detail |
+| GET | `/api/sessions/:key/relations` | session relations |
+| GET | `/api/sessions/:key/events` | session event timeline |
+| GET | `/api/v1/memory/agents` | available memory sources |
+| GET | `/api/v1/memory/list?agentId=<id>` | memory file list |
+| GET | `/api/v1/memory/preview?agentId=<id>&path=<p>` | file preview |
+| GET | `/api/v1/memory/detail?agentId=<id>&path=<p>` | full file detail |
 
-| Method | Endpoint | 说明 |
-|--------|----------|------|
-| GET | `/api/tasks` | 获取任务列表 |
-| POST | `/api/tasks` | 创建新任务 |
-| GET | `/api/runs` | 获取 Subagent 运行记录 |
-| GET | `/api/sessions` | 获取 Session 列表 |
-| GET | `/api/sessions/:key/detail` | Session 详情 |
-| GET | `/api/sessions/:key/relations` | Session 关联 |
-| GET | `/api/sessions/:key/events` | Session 事件 |
-| GET | `/api/v1/memory/agents` | 可用 Agent 列表 |
-| GET | `/api/v1/memory/list?agentId=<id>` | Memory 文件列表 |
-| GET | `/api/v1/memory/preview?agentId=<id>&path=<p>` | 文件预览 |
+## Open Source Notes
 
-## 版本
+- License: [MIT](./LICENSE)
+- Contribution guide: [CONTRIBUTING.md](./CONTRIBUTING.md)
+- Security policy: [SECURITY.md](./SECURITY.md)
+- Code of conduct: [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md)
 
-v0.1.0
+## Status
+
+Current version: `v0.1.0`

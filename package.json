@@ -1,7 +1,7 @@
 {
   "name": "agent-dashboard",
   "version": "0.1.0",
-  "description": "OpenClaw 多 Agent 管理端，可视化监控 Agent 运行状态、任务与记忆",
+  "description": "OpenClaw dashboard for monitoring sessions, memory, tasks, agents, and token usage.",
   "private": true,
   "type": "module",
   "scripts": {
