@@ -2,7 +2,26 @@
 
 [English](./README.md) | 简体中文
 
-ClawBoard 是一个面向 OpenClaw 的多 Agent 可视化管理面板，用来统一查看 sessions、memory、tasks、agents 和 token usage。
+<p align="center">
+  <img src="./docs/screenshots/setup-page.png" alt="ClawBoard 设置" width="800" />
+</p>
+
+## 截图
+
+<p align="center">
+  <img src="./docs/screenshots/dashboard.png" alt="Dashboard" width="800" />
+  <br/><em>Dashboard — Token 趋势、模型分布、Agent 概览</em>
+</p>
+
+<p align="center">
+  <img src="./docs/screenshots/memory.png" alt="Memory" width="800" />
+  <br/><em>Memory — 多 Agent 记忆浏览与预览</em>
+</p>
+
+<p align="center">
+  <img src="./docs/screenshots/tasks.png" alt="Tasks" width="800" />
+  <br/><em>Tasks — 看板与自动刷新</em>
+</p>
 
 ## 功能
 
