@@ -6,7 +6,24 @@ English | [简体中文](./README.zh-CN.md)
   <img src="./docs/screenshots/setup-page.png" alt="ClawBoard Setup" width="800" />
 </p>
 
-ClawBoard is an OpenClaw dashboard for monitoring sessions, memory, tasks, agents, and token usage in one place.
+## Screenshots
+
+<p align="center">
+  <img src="./docs/screenshots/dashboard.png" alt="Dashboard" width="800" />
+  <br/><em>Dashboard — Token usage trends, model distribution, agent overview</em>
+</p>
+
+<p align="center">
+  <img src="./docs/screenshots/memory.png" alt="Memory" width="800" />
+  <br/><em>Memory — Multi-agent memory browser and preview</em>
+</p>
+
+<p align="center">
+  <img src="./docs/screenshots/tasks.png" alt="Tasks" width="800" />
+  <br/><em>Tasks — Kanban board with auto-refresh</em>
+</p>
+
+## Features
 
 ## Features
 
